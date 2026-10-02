@@ -1,5 +1,14 @@
 # CMAP — Release Notes
 
+## v1.0.RC3 — 2026-10-02
+
+### New Features
+- Cards table can be sorted by Card Name, Title, # of Properties or # of Records. Click a column header to sort ascending; click it again to sort descending. Ties are ordered by Card Name.
+
+### Design
+- Edit, Del, Purge and Recover now share a single "Actions" column.
+- Disabled cards no longer show the Edit button; only Purge and Recover are offered until the card is recovered.
+
 ## v1.0.RC2 — 2026-10-02
 
 ### Design

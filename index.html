@@ -254,6 +254,15 @@ table.data-table tbody td{
 table.data-table tbody tr:last-child td{ border-bottom:none; }
 table.data-table tbody tr:hover{ background:var(--surface-2); }
 th.num, td.num{ text-align:right !important; }
+.sort-btn{
+  all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:4px;
+  font:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; border-radius:4px;
+}
+.sort-btn:hover{ color:var(--text); }
+.sort-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.sort-ind{ display:inline-flex; opacity:.45; }
+th.sorted .sort-btn{ color:var(--text); }
+th.sorted .sort-ind{ opacity:1; color:var(--accent); }
 th.act, td.act{ text-align:center !important; width:1%; }
 th.center, td.center{ text-align:center !important; }
 .cards-table td.num{ font-family:var(--font-mono); }
@@ -435,7 +444,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC2</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC3</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -557,13 +566,11 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <table class="data-table cards-table">
           <thead>
             <tr>
-              <th>Card Name</th>
-              <th>Title</th>
-              <th class="num"># of Properties</th>
-              <th class="num"># of Records</th>
-              <th class="act">Edit</th>
-              <th class="act">Del</th>
-              <th class="act">Purge / Recover</th>
+              <th data-sort="name"><button type="button" class="sort-btn">Card Name<span class="sort-ind" aria-hidden="true"></span></button></th>
+              <th data-sort="title"><button type="button" class="sort-btn">Title<span class="sort-ind" aria-hidden="true"></span></button></th>
+              <th class="num" data-sort="property_count"><button type="button" class="sort-btn"># of Properties<span class="sort-ind" aria-hidden="true"></span></button></th>
+              <th class="num" data-sort="record_count"><button type="button" class="sort-btn"># of Records<span class="sort-ind" aria-hidden="true"></span></button></th>
+              <th class="act">Actions</th>
             </tr>
           </thead>
           <tbody id="cardsBody"></tbody>
@@ -576,7 +583,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 
 </main>
 
-<footer>CMAP v1.0.RC2</footer>
+<footer>CMAP v1.0.RC3</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -661,6 +668,17 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
       <button type="button" class="modal-close" data-close="notes" aria-label="Close">&#x2715;</button>
     </div>
     <div class="modal-body notes-body">
+<h3>v1.0.RC3 <span class="notes-date">2026-10-02</span></h3>
+<h4>New Features</h4>
+<ul>
+  <li>Cards table can be sorted by Card Name, Title, # of Properties or # of Records. Click a column header to sort ascending; click it again to sort descending. Ties are ordered by Card Name.</li>
+</ul>
+<h4>Design</h4>
+<ul>
+  <li>Edit, Del, Purge and Recover now share a single "Actions" column.</li>
+  <li>Disabled cards no longer show the Edit button; only Purge and Recover are offered until the card is recovered.</li>
+</ul>
+<hr>
 <h3>v1.0.RC2 <span class="notes-date">2026-10-02</span></h3>
 <h4>Design</h4>
 <ul>
@@ -709,7 +727,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC2
+   CMAP v1.0.RC3
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -719,7 +737,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC2';
+const APP_VERSION     = '1.0.RC3';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
@@ -1546,7 +1564,7 @@ class IconPicker extends Popover {
 
 
 // ---- APP UI START ----
-const ui = { tab: 'cards', filter: '', hideDisabled: false };
+const ui = { tab: 'cards', filter: '', hideDisabled: false, sort: { key: 'name', dir: 'asc' } };
 
 /* ---------- Save state badge ---------- */
 const SAVE_LABELS = {
@@ -1613,6 +1631,41 @@ const ICO = {
   recover:'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>',
 };
 
+/* ---------- Cards table sorting ---------- */
+const SORT_NUMERIC = { property_count: true, record_count: true };
+const textCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+function sortCards(list){
+  const { key, dir } = ui.sort;
+  const sign = dir === 'desc' ? -1 : 1;
+  list.sort((a, b) => {
+    const r = SORT_NUMERIC[key] ? (Number(a[key]) - Number(b[key])) : textCollator.compare(String(a[key] ?? ''), String(b[key] ?? ''));
+    return (r * sign) || textCollator.compare(a.name, b.name); // ties: Card Name A→Z
+  });
+  return list;
+}
+const SORT_ICO = {
+  asc:  '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14l5-5 5 5"/></svg>',
+  desc: '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg>',
+  none: '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>',
+};
+function renderSortHeaders(){
+  $$('.cards-table th[data-sort]').forEach(th => {
+    const on = th.dataset.sort === ui.sort.key;
+    th.setAttribute('aria-sort', on ? (ui.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    th.classList.toggle('sorted', on);
+    th.querySelector('.sort-ind').innerHTML = SORT_ICO[on ? ui.sort.dir : 'none'];
+    th.querySelector('.sort-btn').title = on
+      ? `Sorted ${ui.sort.dir === 'asc' ? 'ascending' : 'descending'} — click to reverse`
+      : 'Click to sort';
+  });
+}
+function setCardSort(key){
+  ui.sort = ui.sort.key === key
+    ? { key, dir: ui.sort.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: 'asc' };
+  renderCards();
+}
+
 function renderCards(){
   if (!dbIsOpen()) return;
   showCardsLoading(true);
@@ -1628,6 +1681,9 @@ function renderCards(){
     return normalizeCardName(c.name).includes(f) || normalizeCardName(c.title).includes(f);
   });
 
+  sortCards(visible);
+  renderSortHeaders();
+
   const body = $('#cardsBody');
   body.innerHTML = visible.map(c => {
     const dis = !!c.is_disabled;
@@ -1636,11 +1692,12 @@ function renderCards(){
       <td class="cell-title">${esc(c.title)}</td>
       <td class="num">${c.property_count}</td>
       <td class="num">${c.record_count}</td>
-      <td class="act row-actions"><button type="button" class="tbtn" data-row-action="edit" ${dis ? 'disabled title="Recover this Card to edit it"' : 'title="Edit Card"'} aria-label="Edit">${ICO.edit}</button></td>
-      <td class="act row-actions">${dis ? '' : `<button type="button" class="tbtn danger" data-row-action="disable" title="Disable Card" aria-label="Disable">${ICO.del}</button>`}</td>
-      <td class="act row-actions">${dis ? `<span class="act-pair">
+      <td class="act row-actions"><span class="act-pair">${dis ? `
           <button type="button" class="tbtn purge" data-row-action="purge" title="Purge — delete permanently" aria-label="Purge">${ICO.purge}</button>
-          <button type="button" class="tbtn recover" data-row-action="recover" title="Recover — make active again" aria-label="Recover">${ICO.recover}</button></span>` : ''}</td>
+          <button type="button" class="tbtn recover" data-row-action="recover" title="Recover — make active again" aria-label="Recover">${ICO.recover}</button>` : `
+          <button type="button" class="tbtn" data-row-action="edit" title="Edit Card" aria-label="Edit">${ICO.edit}</button>
+          <button type="button" class="tbtn danger" data-row-action="disable" title="Disable Card" aria-label="Disable">${ICO.del}</button>`}
+      </span></td>
     </tr>`;
   }).join('');
 
@@ -1878,6 +1935,7 @@ function wire(){
 
   $$('.tab').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
 
+  $$('.cards-table th[data-sort] .sort-btn').forEach(b => b.addEventListener('click', () => setCardSort(b.closest('th').dataset.sort)));
   $('#cardFilter').addEventListener('input', (e) => { ui.filter = e.target.value; renderCards(); });
   $('#hideDisabled').addEventListener('change', (e) => { ui.hideDisabled = e.target.checked; renderCards(); });
 
