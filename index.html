@@ -160,6 +160,7 @@ html.dark #iconMoon{ opacity:1; color:#14130F; }
 }
 .menu-dropdown[hidden]{ display:none; }
 .menu-item{ width:100%; text-align:left; }
+.menu-empty{ padding:8px 10px; color:var(--muted); font-family:var(--font-mono); font-size:12px; white-space:nowrap; }
 
 /* ---------- Buttons ---------- */
 .import-btn{
@@ -359,14 +360,6 @@ textarea.field.template{ min-height:90px; font-family:var(--font-mono); font-siz
 .ord-num{ font-family:var(--font-mono); font-size:11px; color:var(--muted); min-width:14px; text-align:right; margin-right:2px; }
 .type-lock{ font-family:var(--font-mono); font-size:10px; color:var(--muted); display:block; margin-top:2px; }
 
-/* Release notes (reference .release-note-entry) */
-.notes-body h3{ font-family:var(--font-mono); font-size:12.5px; font-weight:600; color:var(--accent); margin:0 0 2px; }
-.notes-body h3 .notes-date{ color:var(--muted); font-weight:500; margin-left:6px; }
-.notes-body h4{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; margin:8px 0 4px; }
-.notes-body ul{ margin:0; padding-left:18px; font-size:13.5px; color:var(--text); }
-.notes-body li{ margin-bottom:3px; }
-.notes-body hr{ border:none; border-top:1px solid var(--border); margin:6px 0; }
-
 /* ---------- Toasts ---------- */
 .toasts{ position:fixed; bottom:22px; right:22px; z-index:2000; display:flex; flex-direction:column; gap:8px; align-items:flex-end; pointer-events:none; }
 .toast{
@@ -444,7 +437,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC3</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC4</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -483,7 +476,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
         </button>
         <div class="menu-dropdown" id="menuDropdown" hidden>
-          <button type="button" class="import-btn secondary menu-item" data-action="release-notes">Release Notes</button>
+          <div class="menu-empty">No menu items yet.</div>
         </div>
       </div>
     </div>
@@ -583,7 +576,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 
 </main>
 
-<footer>CMAP v1.0.RC3</footer>
+<footer>CMAP v1.0.RC4</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -660,64 +653,6 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
   </div>
 </div>
 
-<!-- ==================== RELEASE NOTES MODAL ==================== -->
-<div id="notesModal" class="modal-overlay" hidden>
-  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="notesTitle">
-    <div class="modal-header">
-      <h2 id="notesTitle">Release Notes</h2>
-      <button type="button" class="modal-close" data-close="notes" aria-label="Close">&#x2715;</button>
-    </div>
-    <div class="modal-body notes-body">
-<h3>v1.0.RC3 <span class="notes-date">2026-10-02</span></h3>
-<h4>New Features</h4>
-<ul>
-  <li>Cards table can be sorted by Card Name, Title, # of Properties or # of Records. Click a column header to sort ascending; click it again to sort descending. Ties are ordered by Card Name.</li>
-</ul>
-<h4>Design</h4>
-<ul>
-  <li>Edit, Del, Purge and Recover now share a single "Actions" column.</li>
-  <li>Disabled cards no longer show the Edit button; only Purge and Recover are offered until the card is recovered.</li>
-</ul>
-<hr>
-<h3>v1.0.RC2 <span class="notes-date">2026-10-02</span></h3>
-<h4>Design</h4>
-<ul>
-  <li>Complete visual redesign to match the Investor design language: Fraunces headings, Inter body text and IBM Plex Mono data, warm cream / coffee-black themes with coral and teal accents.</li>
-  <li>Top bar: logo, name and version pill on the left; database pill, round icon buttons, sliding theme switch and menu on the right. Release Notes moved into the menu.</li>
-  <li>Map / Items / Cards tabs with serif labels and a coral underline, directly under the top bar.</li>
-  <li>Cards live in a labelled panel with a card count, a search box, an inline "Hide disabled cards" checkbox and a compact data table with sticky headers.</li>
-  <li>Edit, Del, Purge and Recover are now small icon buttons; Recover is highlighted in teal, Purge in coral.</li>
-  <li>Restyled Card dialog, confirmation dialogs, toasts (bottom-right), type-ahead and icon picker popovers, and the footer.</li>
-</ul>
-<hr>
-<h3>v1.0.RC1 <span class="notes-date">2026-10-02</span></h3>
-<h4>New Features</h4>
-<ul>
-  <li>Database management: create a new database (default name <code>CMAP.sqlite</code>) or open an existing one. The current file name, save status, Save and Switch Database controls appear in the header.</li>
-  <li>Automatic saving to the opened file after every change (Chrome / Edge, File System Access API), plus a manual Save button.</li>
-  <li>Reopen the last database with one click from the start screen.</li>
-  <li>Fallback for other browsers: open with a file picker and save by downloading; the app tells you when auto-save isn't available.</li>
-  <li>Map, Items and Cards tabs. Map and Items show a "coming soon" state.</li>
-  <li>Cards tab: filter by name or title, "Hide disabled cards" switch, New Card button, and a table with properties and record counts.</li>
-  <li>New / Edit Card dialog: Card Name with live uniqueness check (spaces and letter case are ignored), Title auto-filled from the name, Description, Template, and an editable Properties table (type, label, key, visibility, order).</li>
-  <li>Property types: Icon, Text, Number, Enum, Date.</li>
-  <li>Disable (Del) and Recover cards; Purge permanently deletes a card with all its properties, values and Items. Every destructive step asks for confirmation.</li>
-  <li>Dark / light theme toggle, remembered between visits.</li>
-</ul>
-<h4>Architecture</h4>
-<ul>
-  <li>sql.js 1.13.0 (SQLite in WebAssembly), loaded from cdnjs. The first launch needs an internet connection; the app shows a clear message if the engine can't load. This is a deliberate exception to the "no CDN" rule for CMAP.</li>
-  <li>All data access goes through a single adapter block, ready to be swapped for Supabase later.</li>
-  <li>Portable schema in a single block: TEXT UUID ids, ISO 8601 timestamps, CHECK constraints, no AUTOINCREMENT, PRAGMA or STRICT.</li>
-  <li>Foreign-key cascades are switched on at connection time (SQLite runtime setting, outside the schema block).</li>
-  <li><code>meta</code> table with <code>app</code> and <code>schema_version</code>; non-CMAP or newer-format files are rejected with a clear message.</li>
-  <li>Enum type-ahead and Icon picker components (186 embedded Tabler icons, MIT) are built and tested, ready for the Items phase.</li>
-</ul>
-
-    </div>
-  </div>
-</div>
-
 <!-- ==================== TOASTS ==================== -->
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
@@ -727,7 +662,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC3
+   CMAP v1.0.RC4
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -737,7 +672,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC3';
+const APP_VERSION     = '1.0.RC4';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
@@ -1875,7 +1810,6 @@ function wire(){
           try { localStorage.setItem('cmap-theme', dark ? 'dark' : 'light'); } catch (_) {}
           return;
         }
-        case 'release-notes': return openModal('notesModal', () => closeModal('notesModal'));
         case 'menu': {
           const dd = $('#menuDropdown'); dd.hidden = !dd.hidden; a.setAttribute('aria-expanded', String(!dd.hidden)); return;
         }
@@ -1915,7 +1849,6 @@ function wire(){
       const which = closer.dataset.close;
       if (which === 'card') return requestCloseCardModal();
       if (which === 'confirm') return confirmResolver && confirmResolver(null);
-      if (which === 'notes') return closeModal('notesModal');
     }
     // Menu: close when clicking elsewhere
     if (!e.target.closest('.menu-wrap')){ $('#menuDropdown').hidden = true; $('#btnMenu').setAttribute('aria-expanded', 'false'); }
