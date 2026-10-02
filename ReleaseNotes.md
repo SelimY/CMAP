@@ -1,5 +1,14 @@
 # CMAP — Release Notes
 
+## v1.0.RC2 — 2026-10-02
+
+### Design
+- Complete visual redesign to match the Milestone Tracker design language: Space Grotesk and IBM Plex Mono typography, blue accent, warm-grey light theme and blue-grey dark theme.
+- Single-row top bar: logo, name and version tag on the left; segmented Map / Items / Cards tabs, database controls and round icon buttons on the right.
+- Database controls are now labelled buttons (Save, Switch Database); the save button reads "Download" when auto-save isn't available.
+- Cards table, Card dialog and Properties table use the reference card surfaces, uppercase mono column headers and filled inputs.
+- Restyled confirmation dialogs, toasts, the type-ahead and icon picker popovers, and the footer.
+
 ## v1.0.RC1 — 2026-10-02
 
 ### New Features
