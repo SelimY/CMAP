@@ -355,6 +355,13 @@ textarea.field.template{ min-height:90px; font-family:var(--font-mono); font-siz
 .props-table th.ord, .props-table td.ord{ width:1%; }
 .props-table td.type{ width:118px; }
 .props-table td.vis{ width:104px; }
+.props-table td.opts{ width:1%; white-space:nowrap; }
+.props-table td.opts select.input-text{ width:96px; }
+.opt-hex{ display:inline-flex; align-items:center; gap:4px; }
+.props-table .input-text.opt-num{ width:52px; text-align:right; font-family:var(--font-mono); }
+.opt-sep, .opt-unit{ font-family:var(--font-mono); font-size:11px; color:var(--muted); }
+.opt-check{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11.5px; color:var(--text); cursor:pointer; user-select:none; white-space:nowrap; }
+.opt-none{ color:var(--muted); font-family:var(--font-mono); font-size:11px; padding-left:4px; }
 .props-table input[type="checkbox"]{ accent-color:var(--accent); cursor:pointer; margin:0; }
 .ord-btns{ display:inline-flex; gap:4px; align-items:center; }
 .ord-num{ font-family:var(--font-mono); font-size:11px; color:var(--muted); min-width:14px; text-align:right; margin-right:2px; }
@@ -437,7 +444,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC4</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC5</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -576,7 +583,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 
 </main>
 
-<footer>CMAP v1.0.RC4</footer>
+<footer>CMAP v1.0.RC5</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -614,6 +621,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
               <tr>
                 <th class="ord">Order</th>
                 <th>Type</th>
+                <th>Options</th>
                 <th>Label <span class="req">*</span></th>
                 <th class="center">Key</th>
                 <th>Visibility</th>
@@ -662,7 +670,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC4
+   CMAP v1.0.RC5
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -672,7 +680,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC4';
+const APP_VERSION     = '1.0.RC5';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
@@ -685,6 +693,12 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
     - All timestamps are ISO 8601 TEXT → may become `timestamptz` in Postgres.
     - 0/1 INTEGER flags → may become `boolean` in Postgres (update the CHECKs accordingly).
     - user_id is a placeholder ('sqlite') → becomes `uuid references auth.users` / auth.uid() with RLS.
+    - properties.config is a JSON string with type-specific settings → may become `jsonb` in Postgres:
+        number → {"kind":"integer"} | {"kind":"decimal"}
+        hex    → {"min_length":<int|null>,"max_length":<int|null>}   (hex digits, "0x" excluded)
+        date   → {"include_time":true|false}
+        icon / text / enum → NULL
+    - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f).
   Future (Supabase phase, not created here):
     -- card_access (card_id, grantee_user_id, permission 'read'|'write') for CoWork sharing.
 */
@@ -711,8 +725,9 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE TABLE IF NOT EXISTS properties (
   id          TEXT PRIMARY KEY,
   card_id     TEXT NOT NULL REFERENCES cards (id) ON DELETE CASCADE,
-  type        TEXT NOT NULL CHECK (type IN ('icon', 'text', 'number', 'enum', 'date')),
+  type        TEXT NOT NULL CHECK (type IN ('icon', 'text', 'number', 'hex', 'enum', 'date')),
   label       TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 255),
+  config      TEXT,
   is_key      INTEGER NOT NULL DEFAULT 0 CHECK (is_key IN (0, 1)),
   visibility  TEXT NOT NULL DEFAULT 'show' CHECK (visibility IN ('show', 'hide', 'private')),
   sort_order  INTEGER NOT NULL,
@@ -757,9 +772,9 @@ CREATE TABLE IF NOT EXISTS item_values (
   db.run()/db.exec() directly. In the Supabase phase, the bodies of these
   functions are replaced with Supabase client calls; their signatures stay.
 */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;   // 1 = RC1–RC4, 2 = RC5 (hex type + properties.config)
 const USER_ID = 'sqlite';
-const PROPERTY_TYPES = ['icon', 'text', 'number', 'enum', 'date'];
+const PROPERTY_TYPES = ['icon', 'text', 'number', 'hex', 'enum', 'date'];
 const VISIBILITIES = ['show', 'hide', 'private'];
 const MAX_LEN = 255;
 
@@ -852,14 +867,50 @@ function dbOpenBytes(bytes){
   dbClose();
   dbConnect(candidate);
   if (ver < SCHEMA_VERSION){
-    // Additive migration: create anything missing, then bump the version.
-    tx(() => {
-      db.exec(SCHEMA_SQL);
-      exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", [String(SCHEMA_VERSION)]);
-    });
+    try { dbMigrate(ver); }
+    catch (e){ dbClose(); throw new CmapError('migration_failed', 'This file couldn\u2019t be upgraded to the current CMAP format: ' + (e.message || e)); }
     return { migrated: true };
   }
   return { migrated: false };
+}
+
+/* ---------- Schema migrations (SQLite-specific; NOT part of the schema block) ----------
+   Each step upgrades from version (n-1) to n. Data is always preserved. */
+function propertiesDdl(tableName){
+  const m = SCHEMA_SQL.match(/CREATE TABLE IF NOT EXISTS properties \([\s\S]*?\n\);/);
+  return m[0].replace('CREATE TABLE IF NOT EXISTS properties (', `CREATE TABLE ${tableName} (`);
+}
+const MIGRATIONS = {
+  // v2 (RC5): 'hex' type + properties.config. SQLite can't change a CHECK constraint in place,
+  // so the table is rebuilt (official 12-step procedure) and existing rows get default configs.
+  2(){
+    db.exec(propertiesDdl('properties_v2'));
+    exec(`INSERT INTO properties_v2 (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
+          SELECT id, card_id, type, label,
+                 CASE type WHEN 'number' THEN '{"kind":"integer"}'
+                           WHEN 'date'   THEN '{"include_time":false}'
+                           ELSE NULL END,
+                 is_key, visibility, sort_order, created_at, updated_at
+          FROM properties`);
+    exec('DROP TABLE properties');
+    exec('ALTER TABLE properties_v2 RENAME TO properties');
+  },
+};
+function dbMigrate(fromVersion){
+  // Foreign keys must be off while a referenced table is rebuilt, otherwise dropping it
+  // would cascade-delete enum_values / item_values. The setting can't change inside a transaction.
+  db.run('PRAGMA foreign_keys = OFF;');
+  try {
+    tx(() => {
+      for (let v = fromVersion + 1; v <= SCHEMA_VERSION; v++) if (MIGRATIONS[v]) MIGRATIONS[v]();
+      db.exec(SCHEMA_SQL); // create anything else that is missing (indexes, new tables)
+      const broken = db.exec('PRAGMA foreign_key_check');
+      if (broken.length && broken[0].values.length) throw new Error('foreign key check failed');
+      exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", [String(SCHEMA_VERSION)]);
+    });
+  } finally {
+    dbEnableForeignKeys();
+  }
 }
 
 function dbExportBytes(){
@@ -869,12 +920,26 @@ function dbExportBytes(){
 }
 function dbClose(){ if (db){ try { db.close(); } catch (_) {} db = null; } }
 
+/* ---------- Text sanitization ----------
+   Applied in the adapter to EVERY text before it is stored (last line of defense) and
+   mirrored in the UI for live validation. Removes C0/C1 control characters and DEL.
+   Multi-line fields (Description, Template) keep line breaks and tabs; single-line
+   fields turn them into spaces. Text is NOT stripped of "<" or ">": it is stored as
+   typed and made inert on output (HTML-escaped / textContent), and every SQL statement
+   uses bound parameters. */
+const RX_CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+function sanitizeText(value, { multiline = false } = {}){
+  let s = String(value == null ? '' : value).replace(/\r\n?/g, '\n').replace(RX_CONTROL, '');
+  if (!multiline) s = s.replace(/[\t\n]+/g, ' ');
+  return s;
+}
+
 /* ---------- Validation ---------- */
 function cleanCardInput(input){
-  const name = String(input.name || '').trim();
-  const title = String(input.title || '').trim();
-  const description = String(input.description || '').trim();
-  const template = input.template == null ? '' : String(input.template);
+  const name = sanitizeText(input.name).trim();
+  const title = sanitizeText(input.title).trim();
+  const description = sanitizeText(input.description, { multiline: true }).trim();
+  const template = input.template == null ? '' : sanitizeText(input.template, { multiline: true });
   if (!name) throw new CmapError('invalid', 'Card Name is required.');
   if (name.length > MAX_LEN) throw new CmapError('invalid', 'Card Name can be at most 255 characters.');
   if (!title) throw new CmapError('invalid', 'Title is required.');
@@ -882,13 +947,71 @@ function cleanCardInput(input){
   return { name, title, description: description || null, template: template === '' ? null : template };
 }
 function cleanPropertyInput(p){
-  const label = String(p.label || '').trim();
+  const label = sanitizeText(p.label).trim();
   if (!label) throw new CmapError('invalid', 'Every property needs a label.');
   if (label.length > MAX_LEN) throw new CmapError('invalid', 'Property labels can be at most 255 characters.');
   if (!PROPERTY_TYPES.includes(p.type)) throw new CmapError('invalid', 'Unknown property type.');
   const visibility = VISIBILITIES.includes(p.visibility) ? p.visibility : 'show';
-  return { type: p.type, label, is_key: p.is_key ? 1 : 0, visibility };
+  const config = validatePropertyConfig(p.type, p.config, label);
+  return { type: p.type, label, is_key: p.is_key ? 1 : 0, visibility, config: config == null ? null : JSON.stringify(config) };
 }
+
+/* ---------- Type-specific property settings (properties.config) ---------- */
+function defaultPropertyConfig(type){
+  if (type === 'number') return { kind: 'integer' };
+  if (type === 'hex') return { min_length: null, max_length: null };
+  if (type === 'date') return { include_time: false };
+  return null;
+}
+/** Parses a hex length limit: '' / null → null; otherwise a positive whole number or an error string. */
+function parseHexLength(v){
+  if (v == null || String(v).trim() === '') return { value: null };
+  const s = String(v).trim();
+  if (!/^\d+$/.test(s) || !Number.isSafeInteger(Number(s)) || Number(s) < 1) return { error: 'must be a positive whole number' };
+  return { value: Number(s) };
+}
+/** Validates the settings object for a type and returns the clean config (or null). Throws CmapError. */
+function validatePropertyConfig(type, config, label = 'this property'){
+  const c = config || {};
+  if (type === 'number'){
+    const kind = c.kind == null ? 'integer' : c.kind;
+    if (kind !== 'integer' && kind !== 'decimal') throw new CmapError('invalid', `Number type of "${label}" must be Integer or Decimal.`);
+    return { kind };
+  }
+  if (type === 'hex'){
+    const mn = parseHexLength(c.min_length), mx = parseHexLength(c.max_length);
+    if (mn.error) throw new CmapError('invalid', `Min length of "${label}" ${mn.error}.`);
+    if (mx.error) throw new CmapError('invalid', `Max length of "${label}" ${mx.error}.`);
+    if (mn.value != null && mx.value != null && mn.value > mx.value)
+      throw new CmapError('invalid', `Min length of "${label}" can\u2019t be greater than its max length.`);
+    return { min_length: mn.value, max_length: mx.value };
+  }
+  if (type === 'date') return { include_time: c.include_time === true };
+  return null;
+}
+/** Reads a stored config defensively (the file may come from anywhere). Falls back to defaults. */
+function parsePropertyConfig(type, text){
+  let raw = null;
+  if (typeof text === 'string' && text){ try { raw = JSON.parse(text); } catch (_) { raw = null; } }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaultPropertyConfig(type);
+  try { return validatePropertyConfig(type, raw); } catch (_) { return defaultPropertyConfig(type); }
+}
+
+/* ---------- ITEM VALUE VALIDATION SPEC (Section 8.1) — Item phase, NOT applied in Phase-1 ----------
+   The Item form (Items tab) must validate every value with these rules before saving, in the UI
+   (live, field-level English messages) AND again in the adapter right before the write. */
+const ITEM_VALUE_RULES = Object.freeze({
+  text:   { trim: true, sanitize: 'sanitizeText(value)' },
+  number: { integer: /^[+-]?\d+$/, decimal: /^[+-]?(\d+(\.\d+)?|\.\d+)$/, decimalSeparator: '.', kindFrom: 'config.kind',
+            reject: 'anything non-numeric' },
+  hex:    { prefix: '0x', prefixRequired: true, prefixLocked: 'input is pre-filled with 0x; the prefix cannot be removed or edited',
+            digits: /^[0-9a-fA-F]+$/, minDigits: 1, lengthFrom: 'config.min_length / config.max_length (digits only, prefix excluded)',
+            storeAs: '"0x" + digits, all lowercase (e.g. 0x1a2f)' },
+  date:   { dateOnly: 'YYYY-MM-DD', withTime: 'YYYY-MM-DDTHH:mm (ISO 8601) when config.include_time is true',
+            mustBe: 'a real calendar date; time required when include_time' },
+  enum:   { required: true, maxLength: 255, trim: true, dedupe: 'case-insensitive, per property (upsertEnumValue)' },
+  icon:   { mustBe: 'a key of the embedded ICON_SET (iconExists)' },
+});
 
 /* ---------- Cards ---------- */
 function readCards(){
@@ -908,7 +1031,7 @@ function readCard(id){
   return card;
 }
 function isCardNameTaken(name, excludeId = null){
-  const n = normalizeCardName(name);
+  const n = normalizeCardName(sanitizeText(name));
   if (!n) return false;
   const row = q1('SELECT id FROM cards WHERE user_id = ? AND name_normalized = ? AND id <> ?', [USER_ID, n, excludeId || '']);
   return !!row;
@@ -940,14 +1063,15 @@ function purgeCard(id){ tx(() => exec('DELETE FROM cards WHERE id = ? AND user_i
 function readProperties(cardId){
   return q(`
     SELECT p.*, EXISTS (SELECT 1 FROM item_values v WHERE v.property_id = p.id) AS has_values
-    FROM properties p WHERE p.card_id = ? ORDER BY p.sort_order, p.created_at`, [cardId]);
+    FROM properties p WHERE p.card_id = ? ORDER BY p.sort_order, p.created_at`, [cardId])
+    .map(p => ({ ...p, config: parsePropertyConfig(p.type, p.config) }));
 }
 function propertyHasValues(id){ return !!q1('SELECT 1 AS x FROM item_values WHERE property_id = ? LIMIT 1', [id]); }
 function createProperty(cardId, input, sortOrder){
   const p = cleanPropertyInput(input);
   const id = newId(), t = nowIso();
-  exec(`INSERT INTO properties (id, card_id, type, label, is_key, visibility, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, cardId, p.type, p.label, p.is_key, p.visibility, sortOrder, t, t]);
+  exec(`INSERT INTO properties (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, cardId, p.type, p.label, p.config, p.is_key, p.visibility, sortOrder, t, t]);
   return id;
 }
 function updateProperty(id, input, sortOrder){
@@ -956,8 +1080,8 @@ function updateProperty(id, input, sortOrder){
   if (!cur) throw new CmapError('not_found', 'Property not found.');
   if (cur.type !== p.type && propertyHasValues(id))
     throw new CmapError('type_locked', `The type of "${p.label}" can't change because Items already use it.`);
-  exec(`UPDATE properties SET type = ?, label = ?, is_key = ?, visibility = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-    [p.type, p.label, p.is_key, p.visibility, sortOrder, nowIso(), id]);
+  exec(`UPDATE properties SET type = ?, label = ?, config = ?, is_key = ?, visibility = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+    [p.type, p.label, p.config, p.is_key, p.visibility, sortOrder, nowIso(), id]);
   if (cur.type === 'enum' && p.type !== 'enum') exec('DELETE FROM enum_values WHERE property_id = ?', [id]);
 }
 function deleteProperty(id){ exec('DELETE FROM properties WHERE id = ?', [id]); }
@@ -989,7 +1113,7 @@ function readEnumValues(propertyId){
 /** Inserts the value if it is new for this property (case-insensitive); otherwise returns the existing one.
  *  countUsage=true increments usage_count (call when an Item actually uses the value). */
 function upsertEnumValue(propertyId, value, { countUsage = true } = {}){
-  const v = String(value || '').trim();
+  const v = sanitizeText(value).trim();
   if (!v) throw new CmapError('invalid', 'Value is required.');
   if (v.length > MAX_LEN) throw new CmapError('invalid', 'Values can be at most 255 characters.');
   const n = normalizeEnumValue(v);
@@ -1175,7 +1299,7 @@ async function newDatabaseFlow(){
       actions: [{ label: 'Cancel', value: null }, { label: 'Create & download', value: 'ok', kind: 'primary' }],
     });
     if (!r || r.value !== 'ok') return;
-    let name = (r.input || '').trim() || DEFAULT_DB_NAME;
+    let name = sanitizeText(r.input || '').replace(/[\\/:*?"<>|]/g, '').trim() || DEFAULT_DB_NAME;
     if (!/\.(sqlite3?|db)$/i.test(name)) name += '.sqlite';
     dbCreateNew();
     store.handle = null; store.fileName = name; store.canWrite = false; store.dirty = false; store.changeSeq = 0;
@@ -1448,7 +1572,7 @@ class TypeAhead extends Popover {
     if (this.active >= this.rows.length) this.active = Math.max(0, this.rows.length - 1);
     this.list.innerHTML = this.rows.map((r, i) => r.isNew
       ? `<li class="ta-item ta-new${i === this.active ? ' active' : ''}" data-i="${i}" role="option">Add \u201c${esc(r.value)}\u201d</li>`
-      : `<li class="ta-item${i === this.active ? ' active' : ''}" data-i="${i}" role="option"><span>${esc(r.value)}</span><span class="ta-count">${r.count ?? ''}</span></li>`
+      : `<li class="ta-item${i === this.active ? ' active' : ''}" data-i="${i}" role="option"><span>${esc(r.value)}</span><span class="ta-count">${esc(r.count ?? '')}</span></li>`
     ).join('');
     this.list.hidden = this.rows.length === 0;
     const act = this.list.children[this.active];
@@ -1675,7 +1799,7 @@ async function onRowAction(action, id){
 }
 
 /* ---------- Card modal ---------- */
-const TYPE_LABELS = { icon: 'Icon', text: 'Text', number: 'Number', enum: 'Enum', date: 'Date' };
+const TYPE_LABELS = { icon: 'Icon', text: 'Text', number: 'Number', hex: 'Hex', enum: 'Enum', date: 'Date' };
 const VIS_LABELS = { show: 'Show', hide: 'Hide', private: 'Private' };
 const form = { mode: 'new', cardId: null, props: [], snapshot: '', attempted: false, seq: 0 };
 
@@ -1685,6 +1809,7 @@ function openCardModal(card = null){
   form.attempted = false;
   form.props = card ? card.properties.map(p => ({
     _k: ++form.seq, id: p.id, type: p.type, label: p.label, is_key: !!p.is_key, visibility: p.visibility, has_values: !!p.has_values,
+    config: formConfigFrom(p.type, p.config),
   })) : [];
   $('#cardModalTitle').textContent = card ? `Edit Card \u00b7 ${card.name}` : 'New Card';
   $('#fName').value = card ? card.name : '';
@@ -1701,7 +1826,35 @@ function openCardModal(card = null){
 }
 function formSnapshot(){
   return JSON.stringify([$('#fName').value, $('#fTitle').value, $('#fDesc').value, $('#fTemplate').value,
-    form.props.map(p => [p.id, p.type, p.label, p.is_key, p.visibility])]);
+    form.props.map(p => [p.id, p.type, p.label, p.is_key, p.visibility, p.config])]);
+}
+/** Form-side copy of a config. Hex limits are kept as the raw strings the user typed. */
+function formConfigFrom(type, cfg){
+  const c = cfg || defaultPropertyConfig(type);
+  if (type === 'hex') return { min_length: c.min_length == null ? '' : String(c.min_length), max_length: c.max_length == null ? '' : String(c.max_length) };
+  return c ? { ...c } : null;
+}
+/** Returns { min, max, order } error flags for a hex property in the form. */
+function hexConfigErrors(p){
+  if (p.type !== 'hex') return null;
+  const mn = parseHexLength(p.config.min_length), mx = parseHexLength(p.config.max_length);
+  const order = !mn.error && !mx.error && mn.value != null && mx.value != null && mn.value > mx.value;
+  return { min: !!mn.error || order, max: !!mx.error || order, msg:
+    mn.error ? 'Hex min length must be a positive whole number.' :
+    mx.error ? 'Hex max length must be a positive whole number.' :
+    order ? 'Hex min length can\u2019t be greater than max length.' : '' };
+}
+function renderPropOptions(p){
+  if (p.type === 'number') return `<select class="input-text" data-field="cfg-kind" aria-label="Number type" title="Number type">
+      <option value="integer" ${p.config.kind === 'integer' ? 'selected' : ''}>Integer</option>
+      <option value="decimal" ${p.config.kind === 'decimal' ? 'selected' : ''}>Decimal</option></select>`;
+  if (p.type === 'hex') return `<span class="opt-hex" title="Number of hex digits, excluding the 0x prefix. Leave empty for no limit.">
+      <input class="input-text opt-num" data-field="cfg-min" type="text" inputmode="numeric" maxlength="6" placeholder="Min" aria-label="Min length" value="${esc(p.config.min_length)}">
+      <span class="opt-sep">–</span>
+      <input class="input-text opt-num" data-field="cfg-max" type="text" inputmode="numeric" maxlength="6" placeholder="Max" aria-label="Max length" value="${esc(p.config.max_length)}">
+      <span class="opt-unit">digits</span></span>`;
+  if (p.type === 'date') return `<label class="opt-check"><input type="checkbox" data-field="cfg-time" ${p.config.include_time ? 'checked' : ''}> Include time</label>`;
+  return '<span class="opt-none">\u2014</span>';
 }
 async function requestCloseCardModal(){
   if (formSnapshot() !== form.snapshot){
@@ -1729,6 +1882,7 @@ function renderProps(){
       <td class="type"><select class="input-text" data-field="type" ${p.has_values ? 'disabled title="Items already use this property"' : ''}>
         ${Object.keys(TYPE_LABELS).map(t => `<option value="${t}" ${t === p.type ? 'selected' : ''}>${TYPE_LABELS[t]}</option>`).join('')}
       </select>${p.has_values ? '<span class="type-lock">In use by Items</span>' : ''}</td>
+      <td class="opts">${renderPropOptions(p)}</td>
       <td><input class="input-text${form.attempted && !p.label.trim() ? ' is-err' : ''}" data-field="label" type="text" maxlength="255" value="${esc(p.label)}" placeholder="e.g. Status" aria-label="Label"></td>
       <td class="center"><input type="checkbox" data-field="is_key" ${p.is_key ? 'checked' : ''} aria-label="Key"></td>
       <td class="vis"><select class="input-text" data-field="visibility" aria-label="Visibility">
@@ -1743,7 +1897,7 @@ function renderProps(){
 
 function validateCardForm(){
   const nameEl = $('#fName'), titleEl = $('#fTitle');
-  const name = nameEl.value.trim(), title = titleEl.value.trim();
+  const name = sanitizeText(nameEl.value).trim(), title = sanitizeText(titleEl.value).trim();
   const nameMsg = $('#fNameMsg'), titleMsg = $('#fTitleMsg');
   let nameOk = false;
   nameEl.classList.remove('is-ok', 'is-err'); nameMsg.className = 'field-msg'; nameMsg.textContent = '';
@@ -1760,11 +1914,24 @@ function validateCardForm(){
   titleEl.classList.toggle('is-err', form.attempted && !titleOk);
   titleMsg.className = 'field-msg' + (form.attempted && !titleOk ? ' err' : '');
   titleMsg.textContent = form.attempted && !titleOk ? 'Title is required.' : '';
-  const labelsOk = form.props.every(p => p.label.trim());
-  $$('#propsBody input[data-field="label"]').forEach(inp => inp.classList.toggle('is-err', form.attempted && !inp.value.trim()));
+  const labelsOk = form.props.every(p => sanitizeText(p.label).trim());
+  $$('#propsBody input[data-field="label"]').forEach(inp => inp.classList.toggle('is-err', form.attempted && !sanitizeText(inp.value).trim()));
+  // Hex limits are checked live (not only after a save attempt).
+  let hexOk = true;
+  form.props.forEach(p => {
+    const e = hexConfigErrors(p); if (!e) return;
+    const tr = $(`#propsBody tr[data-k="${p._k}"]`);
+    if (tr){ tr.querySelector('[data-field="cfg-min"]').classList.toggle('is-err', e.min); tr.querySelector('[data-field="cfg-max"]').classList.toggle('is-err', e.max); }
+    if (e.msg) hexOk = false;
+  });
   const taken = !!name && isCardNameTaken(name, form.cardId);
   $('#btnSaveCard').disabled = taken || !name;
-  return nameOk && titleOk && labelsOk;
+  const hexMsg = (form.props.map(hexConfigErrors).find(e => e && e.msg) || {}).msg || '';
+  const err = $('#cardFormError');
+  if (hexMsg) err.textContent = hexMsg;
+  else if (err.dataset.hex === '1') err.textContent = '';
+  err.dataset.hex = hexMsg ? '1' : '';
+  return nameOk && titleOk && labelsOk && hexOk;
 }
 
 function saveCardFromForm(){
@@ -1772,7 +1939,9 @@ function saveCardFromForm(){
   const ok = validateCardForm();
   const err = $('#cardFormError');
   if (!ok){
-    err.textContent = form.props.some(p => !p.label.trim()) ? 'Every property needs a label.' : 'Please fix the highlighted fields.';
+    const hexMsg = (form.props.map(hexConfigErrors).find(e => e && e.msg) || {}).msg;
+    err.textContent = form.props.some(p => !sanitizeText(p.label).trim()) ? 'Every property needs a label.'
+      : hexMsg || 'Please fix the highlighted fields.';
     return;
   }
   err.textContent = '';
@@ -1780,14 +1949,15 @@ function saveCardFromForm(){
     id: form.cardId,
     name: $('#fName').value, title: $('#fTitle').value,
     description: $('#fDesc').value, template: $('#fTemplate').value,
-    properties: form.props.map(p => ({ id: p.id, type: p.type, label: p.label, is_key: p.is_key, visibility: p.visibility })),
+    properties: form.props.map(p => ({ id: p.id, type: p.type, label: p.label, is_key: p.is_key, visibility: p.visibility, config: p.config })),
   };
   try { saveCardWithProperties(input); }
   catch (e){ err.textContent = e.message || 'The Card couldn\u2019t be saved.'; validateCardForm(); return; }
   closeModal('cardModal');
   markDirty();
   renderCards();
-  toast(form.mode === 'new' ? `Created \u201c${input.name.trim()}\u201d` : `Saved \u201c${input.name.trim()}\u201d`);
+  const shown = sanitizeText(input.name).trim();
+  toast(form.mode === 'new' ? `Created \u201c${shown}\u201d` : `Saved \u201c${shown}\u201d`);
 }
 
 function findProp(el){ const tr = el.closest('tr[data-k]'); return tr ? form.props.find(p => p._k === +tr.dataset.k) : null; }
@@ -1815,7 +1985,7 @@ function wire(){
         }
         case 'new-card': return openCardModal(null);
         case 'add-prop': {
-          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, visibility: 'show', has_values: false });
+          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, visibility: 'show', has_values: false, config: null });
           renderProps(); validateCardForm();
           const inputs = $$('#propsBody input[data-field="label"]'); inputs[inputs.length - 1].focus();
           return;
@@ -1869,7 +2039,7 @@ function wire(){
   $$('.tab').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
 
   $$('.cards-table th[data-sort] .sort-btn').forEach(b => b.addEventListener('click', () => setCardSort(b.closest('th').dataset.sort)));
-  $('#cardFilter').addEventListener('input', (e) => { ui.filter = e.target.value; renderCards(); });
+  $('#cardFilter').addEventListener('input', (e) => { ui.filter = sanitizeText(e.target.value); renderCards(); });
   $('#hideDisabled').addEventListener('change', (e) => { ui.hideDisabled = e.target.checked; renderCards(); });
 
   // Card modal fields
@@ -1897,11 +2067,18 @@ function wire(){
     const p = findProp(e.target); if (!p) return;
     const f = e.target.dataset.field;
     if (f === 'label'){ p.label = e.target.value; validateCardForm(); }
+    else if (f === 'cfg-min' || f === 'cfg-max'){ p.config[f === 'cfg-min' ? 'min_length' : 'max_length'] = e.target.value; validateCardForm(); }
   });
   $('#propsBody').addEventListener('change', (e) => {
     const p = findProp(e.target); if (!p) return;
     const f = e.target.dataset.field;
-    if (f === 'type') p.type = e.target.value;
+    if (f === 'type'){
+      p.type = e.target.value; p.config = formConfigFrom(p.type, null);
+      renderProps(); validateCardForm();
+      const sel = $(`#propsBody tr[data-k="${p._k}"] select[data-field="type"]`); if (sel) sel.focus();
+    }
+    else if (f === 'cfg-kind') p.config.kind = e.target.value;
+    else if (f === 'cfg-time') p.config.include_time = e.target.checked;
     else if (f === 'visibility') p.visibility = e.target.value;
     else if (f === 'is_key') p.is_key = e.target.checked;
   });
