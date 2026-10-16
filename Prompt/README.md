@@ -1,7 +1,7 @@
 # CMAP — Yazılım Geliştirme Prompt'u (Faz-1)
 
 ## 1. Özet
-CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (form/kayıt tipleri) üzerinden "Item" adında yapılandırılmış kayıtlar oluşturup yönetebildiği, **tek-kullanıcılı ve tamamen offline-first** çalışan bir web uygulamasıdır. Kullanıcı, önce bir Card (şablon) tanımlar; bu Card'a ait Property'ler (alanlar) belirler; ardından bu Card'ı kullanarak istediği kadar Item (gerçek veri kaydı) oluşturur. Tüm veri, kullanıcının kendi diskindeki tek bir `.sqlite` dosyasında tutulur; sunucu tarafı bir backend veya hesap sistemi yoktur. Faz-1 kapsamı yalnızca Card tanımlama/yönetimi ve veritabanı dosyası yönetimi ile sınırlıdır; Item oluşturma akışının UI detayları ve Map sekmesi sonraki fazlarda tanımlanacaktır.
+CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (form/kayıt tipleri) üzerinden "Item" adında yapılandırılmış kayıtlar oluşturup yönetebildiği, **tek-kullanıcılı ve tamamen offline-first** çalışan bir web uygulamasıdır. Kullanıcı, önce bir Card (şablon) tanımlar; bu Card'a ait Property'ler (alanlar) belirler; ardından bu Card'ı kullanarak istediği kadar Item (gerçek veri kaydı) oluşturur. Tüm veri, kullanıcının kendi diskindeki tek bir `.sqlite` dosyasında tutulur; sunucu tarafı bir backend veya hesap sistemi yoktur. Kapsam: Card tanımlama/yönetimi, veritabanı dosyası yönetimi ve Items sayfası (klasör ağacı + Item tablosu + Item formu). Map sekmesi sonraki fazda tanımlanacaktır.
 
 ## 2. Hedef Kullanıcı ve Kullanım Senaryosu
 - Faz-1'de uygulama tek-kullanıcılı ve offline-first'tir; tüm veri, kullanıcının seçtiği/oluşturduğu tek bir `.sqlite` dosyasında yerel olarak saklanır. Hesap/giriş sistemi yoktur.
@@ -25,7 +25,7 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 
 ### 3.3 Ana Navigasyon
 11. Bir veritabanı açıldıktan/oluşturulduktan sonra ekranda 3 tab belirir: **Map**, **Items**, **Cards** (Ekran Görüntüsü 3'teki genel yerleşime görsel referans).
-12. Faz-1'de yalnızca **Cards** tabinin fonksiyonları tanımlanmıştır. Map ve Items tabları arayüzde görünmeli, tıklanabilir olmalı, ancak içerik olarak "Coming soon" durumu göstermelidir.
+12. **Cards** ve **Items** tablarının fonksiyonları tanımlıdır (bkz. 3.4 ve 3.7). **Map** tabı arayüzde görünmeli, tıklanabilir olmalı, ancak içerik olarak "Coming soon" durumu göstermelidir.
 
 ### 3.4 Cards Tab — Card Listeleme
 13. Cards tabına geçildiğinde, kayıtlı Card'ları listeleyen bir tablo gösterilmeli.
@@ -34,14 +34,14 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
     - Card Name
     - Title
     - # of Properties (yalnızca değer taşıyan Property'ler sayılır; **Tab ve Separator satırları sayılmaz**)
-    - # of Records (bu Card ile oluşturulmuş Item sayısı)
+    - # of Records (bu Card'a bağlı gerçek Item sayısı)
     - Edit (düzenleme butonu)
     - Del (silme butonu — kaydı fiziksel silmez, `is_disabled` alanıyla devre dışı bırakır/gizler)
-    - Purge/Recover (yalnızca disable edilmiş Card'lar için görünür: Purge = kalıcı silme, Recover = tekrar aktif etme)
+    - Purge/Recover (yalnızca disable edilmiş Card'lar için görünür: Purge = kalıcı silme, Recover = tekrar aktif etme; **Card'a bağlı en az bir Item varsa Purge butonu devre dışıdır** ve ipucu gösterir: "This Card has Items and cannot be purged. Delete its Items first.")
 16. Del butonuna basıldığında, işlem gerçekleşmeden önce bir **onay modalı** gösterilmeli (İngilizce — ör. "Are you sure you want to disable this Card?").
-17. Purge butonuna basıldığında da bir **onay modalı** gösterilmeli (ör. "This action cannot be undone. This Card and all its Items will be permanently deleted."). Tek adımlı modal onayı yeterlidir.
-18. Bir Card disable edildiğinde: Card'a ait Item verileri **değişmez/silinmez**, yalnızca o Card'a ait Item'ları listeleyen arayüz elemanları gizlenir.
-19. Bir Card purge edildiğinde: Card'a bağlı tüm Item kayıtları da **kalıcı olarak silinir**.
+17. Purge butonuna basıldığında da bir **onay modalı** gösterilmeli (ör. "This action cannot be undone. This Card will be permanently deleted. Nodes linked to this Card will become Folders."). Tek adımlı modal onayı yeterlidir.
+18. Bir Card disable edildiğinde: Card'a ait Item verileri **değişmez/silinmez**. Card'a bağlı düğümler Item-Tree'de kalır, Items tablosu gizlenmez; ancak "New" butonu gösterilmez ve satırların düzenleme (kalem) ikonu devre dışı olur (silme ve satır sıralama çalışır). Disable edilmiş Card'lar düğüm Type dropdown'ında listelenmez. Recover edilince her şey normale döner.
+19. Card'a bağlı Item yoksa purge mümkündür ve Card kalıcı silinir (Property'ler ve EnumValue'lar cascade ile silinir). Purge edilen Card'a bağlı düğümler silinmez, otomatik olarak **"Folder"** tipine döner. Item'ı olan Card purge edilemez.
 20. Disable edilmiş Card'lar tablodan kaldırılmaz; listede **soluk (opacity: 0.5)** görünümle kalırlar. Tablo üzerinde bir **"Hide disabled cards"** filtre anahtarı bulunmalı; varsayılan kapalıdır (disabled Card'lar soluk gösterilir), açıldığında tamamen gizlenir.
 21. Tablo boşsa veya filtre sonucunda hiç kayıt kalmıyorsa uygun bir **empty-state** mesajı gösterilmeli (İngilizce, ör. "No Cards yet" / "No Cards match your filter").
 22. Veri veritabanından yüklenirken uygun bir **loading-state** gösterilmeli.
@@ -61,7 +61,7 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 26. Her Card'ın altında sınırsız sayıda Property tanımlanabilir; "New Property" butonu ile ekleme yapılır.
 27. Property tipleri:
     - **Icon**: Uygulamaya **gömülü (embedded), harici CDN/font gerektirmeyen bir SVG ikon alt kümesi** (ör. Tabler/Lucide'dan seçilmiş ~150–200 ikonluk, kategorilere ayrılmış bir alt küme, tek renk/outline). Seçici, ikonları kategorilere göre gruplu göstermelidir. Veritabanında yalnızca ikonun adı/anahtarı saklanır.
-    - **Text**: Serbest metin girişi.
+    - **Text**: Serbest metin girişi. Maksimum uzunluk Card tanımı ekranında belirlenir (bkz. madde 29).
     - **Number**: Sayısal değer girişi. Sayı türü (tam sayı / ondalık) Card tanımı ekranında seçilir (bkz. madde 29).
     - **Hex**: Genel amaçlı onaltılık (hexadecimal) veri girişi (renk kodu değil; ör. `0x1a2f`, bayt dizisi, kimlik değeri). Giriş alanı her zaman **`0x` ön ekiyle dolu** gelir; ön ek **zorunludur** ve kullanıcı tarafından silinememeli/değiştirilememelidir. Minimum/maksimum uzunluk Card tanımı ekranında belirlenir (bkz. madde 29).
     - **Enum**: Item kaydı sırasında type-ahead ile değer girilen alan. Değer listesi tamamen dinamiktir — kullanıcı yeni değer yazarsa önerilere otomatik eklenir (Ekran Görüntüsü 4'e görsel referans). **Enum değer listesi her zaman ilgili Property'ye özeldir; Card'lar/property'ler arası çapraz kullanılmaz.**
@@ -75,17 +75,55 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
     - **Key**: Checkbox. Faz-1'de yalnızca veri modelinde tutulur; davranışı Map fazında tanımlanacaktır.
     - **Visibility**: Show / Hide / Private. Faz-1'de yalnızca veri modelinde tutulur; "Private" davranışı Map fazında tanımlanacaktır.
     - **Tab ve Separator** tiplerinde Key ve Visibility ayarları arayüzde gösterilmez; veritabanında `is_key = 0`, `visibility = 'show'` sabit olarak saklanır.
-29. **Tipe özel ayarlar:** Property'nin tipi seçildiğinde, Property tanım satırında/modalında o tipe özel aşağıdaki ek ayarlar gösterilmelidir (ilgili tip seçili değilken gizlenir). Bu ayarlar Faz-1'de Card tanımı ekranında girilir ve saklanır; Item girişinde uygulanmaları Item fazında yapılır (bkz. Bölüm 8.1).
+29. **Tipe özel ayarlar:** Property'nin tipi seçildiğinde, Property tanım satırında/modalında o tipe özel aşağıdaki ek ayarlar gösterilmelidir (ilgili tip seçili değilken gizlenir). Bu ayarlar Card tanımı ekranında girilir ve saklanır; Item formunda uygulanır (bkz. 3.7 ve Bölüm 8.1).
+    - **Text** → "Max length": tam sayı, **1–4000** aralığında, varsayılan **255**. Aralık dışı veya tam sayı olmayan değerde Property kaydedilemez ve İngilizce hata mesajı gösterilir. `config`'te yoksa (eski Property'ler) **255** varsayılır; varsayım okuma anında uygulanır, kayıtlar değiştirilmek zorunda değildir.
     - **Number** → "Number type": `Integer` | `Decimal` (zorunlu seçim, varsayılan: `Integer`). Ondalık ayırıcı nokta (`.`) olmalıdır.
     - **Hex** → "Min length" ve "Max length": `0x` ön eki HARİÇ onaltılık hane sayısı cinsinden, opsiyonel tam sayı alanları (boş bırakılırsa o yönde sınır yoktur). Doğrulama: değerler pozitif tam sayı olmalı; ikisi de girilmişse Min ≤ Max olmalı, aksi halde Property kaydedilemez ve İngilizce bir hata mesajı gösterilmelidir.
-    - **Date** → "Include time" onay kutusu (varsayılan: kapalı). Kapalıysa yalnızca tarih (`YYYY-MM-DD`), açıksa tarih+saat (`YYYY-MM-DDTHH:mm`, ISO 8601) tutulur.
+    - **Date** → "Include time" onay kutusu (varsayılan: kapalı). Kapalıysa yalnızca tarih (`YYYY-MM-DD`), açıksa tarih+saat (`YYYY-MM-DDTHH:mm:ss`, ISO 8601) tutulur. Okurken saniyesiz (`THH:mm`) bir değerle karşılaşılırsa saniye `00` kabul edilir.
     - **Percent** → "Min" ve "Max": tam sayı, varsayılanlar 0 ve 100. Doğrulama: ikisi de 0–100 aralığında tam sayı olmalı ve Min ≤ Max olmalıdır; aksi halde Property kaydedilemez ve İngilizce hata mesajı gösterilir. Items formundaki giriş alanı (Item fazı): sayı kutusu ve yanında "%" işareti; kaydırıcı (slider) kullanılmaz.
     - **CheckBox** → "Default value": `Unchecked` (varsayılan) | `Checked`.
-    - Icon, Text, Enum, Tab ve Separator tiplerinde ek ayar yoktur (Tab ve Separator için yalnızca zorunlu Label).
+    - Icon, Enum, Tab ve Separator tiplerinde ek ayar yoktur (Tab ve Separator için yalnızca zorunlu Label).
 30. **Tab / Separator kuralları:**
     - Tab ve Separator'ın Label'ı zorunludur (max 255 karakter, trim). Tab'de Label sekmenin adı, Separator'da alt başlık metnidir.
     - **Tab yerleşimi** (Property'ler `sort_order` sırasına göre işlenir): İlk Tab'den önce kalan tüm Property'ler otomatik olarak **"Main"** adlı sekmeye girer. "Main" adı sabittir, kullanıcı değiştiremez ve Card'da bir Tab Property'si olarak tutulmaz. Her Tab Property'si, kendisinden sonraki Property'leri bir sonraki Tab'e veya listenin sonuna kadar kendi sekmesine alır. Örnek: [text, hex, tab "data", hex2] → "Main" sekmesinde text ve hex; "data" sekmesinde hex2. Hiç Tab yoksa tek sekme (Main) vardır; bu durumda sekme çubuğunun gösterilip gösterilmeyeceği Item fazının kararıdır.
-    - Tab ve Separator'ın Items formundaki render'ı Item fazında geliştirilir; Faz-1'de yalnızca Card tanımı ekranında tanımlanır ve saklanır.
+    - Tab ve Separator'ın Items formundaki render'ı için bkz. 3.7.5.
+
+### 3.7 Items Sayfası
+**3.7.1 Genel yerleşim**
+- Items tabı File Explorer benzeri iki panelli bir ekrandır: solda **"Item-Tree"** (~%30 genişlik), sağda **"Items"** (~%70 genişlik). Bu ekranda **sayfanın kendisi dikey kaymaz** (header ve tab çubuğu hariç kalan yüksekliği kaplar); sol ağaç ve sağ tablo **kendi içinde dikey kayar**. Tablo çok kolonluysa kendi içinde yatay da kayar.
+- Harici kütüphane kullanılmaz; sürükle-bırak için tarayıcının yerleşik HTML5 Drag & Drop API'si kullanılır.
+
+**3.7.2 Sol panel — Item-Tree**
+- Üst alan: panel başlığı "Item-Tree" ve aynı satırda **"New Project"** butonu; altında **"Project:"** etiketi ve yanında bir dropdown. Dropdown, hiçbir yere bağlı olmayan **kök düğümleri (Project)** listeler (`sort_order` sırasına göre); seçim değişince ağaç yenilenir. "New Project", düğüm formunu açar ve `parent_id = NULL` olan yeni bir kök düğüm yaratır; oluşunca otomatik seçili Project olur.
+- Ağaç, seçili Project'in kök düğümüyle başlar; kök düğümde de diğer düğümler gibi ikonlar bulunur. Her düğüm satırında: aç/kapa oku (alt düğümü varsa), tip ikonu (Folder veya Card; gömülü SVG), düğüm adı, Card-tipliyse bağlı Card'ın adı (soluk metin) ve sağda her zaman görünür üç ikon: **+** (alt düğüm ekle), **kalem** (düzenle), **çöp kutusu** (sil).
+- **Sürükle-bırak:** Bir düğümü başka bir düğümün **üstüne** bırakmak onu o düğümün son alt düğümü yapar; iki düğüm **arasına** bırakmak sıralamayı değiştirir (bırakma konumu görsel göstergeyle belirtilir). Düğüm kendisine veya kendi alt ağacına bırakılamaz (adapter'da da engellenir). Kök (Project) düğümleri sürüklenemez. Yeni konum/sıra kalıcıdır (`parent_id` ve `sort_order`, tek transaction).
+- Aç/kapa durumu, seçili düğüm ve seçili Project **localStorage**'da (veritabanı dosya adına göre anahtarlanarak) saklanır ve açılışta geri yüklenir; kayıtlı kimlik artık yoksa ilk Project'e ve boş seçime düşülür. localStorage'dan okunan değerler güvenilmez girdi sayılır ve doğrulanır.
+- Düğüm adları **tekil olmak zorunda değildir** (aynı üst düğüm altında dahil; A → A → A geçerlidir); benzersizlik doğrulaması yoktur.
+
+**3.7.3 Düğüm formu (New Project / + / Kalem) — modal**
+- Alanlar: **Name** (zorunlu, max 255, trim) ve **Type** dropdown'ı. Varsayılan **"Folder"**; diğer seçenekler aktif (disable edilmemiş) Card'lardır. Yeni düğüm eklenirken tip her zaman sorulur. Disable edilmiş Card'lar listelenmez (yalnızca düğüm hâlihazırda disable edilmiş bir Card'a bağlıysa düzenleme formunda mevcut değer olarak görünür).
+- **Düzenleme kuralı:** Düğümde en az bir Item varsa Type dropdown'ı kilitlidir (açıklama: "This node has Items, so its type cannot be changed."). Item'ı olmayan düğümde tip serbestçe değişir; alt düğümlerin olması tip değişimini engellemez. Card tipli düğümün de alt düğümü olabilir; "Folder" düğümü Item tutamaz.
+- **Düğüm silme:** Çöp ikonu → onay modalı; düğüm adı, alt düğüm sayısı ve toplam Item sayısı gösterilir (ör. "This will permanently delete 'X', 3 sub-nodes and 12 Items. This action cannot be undone."). Onayda düğüm, tüm alt ağacı ve bu düğümlerdeki tüm Item/ItemValue kayıtları tek transaction'da kalıcı silinir. Kök silinirse ilk kalan Project seçilir; yoksa "No projects yet" durumu gösterilir.
+
+**3.7.4 Sağ panel — Items tablosu**
+- Başlık "Items". Tablo, seçili düğümün **yalnızca doğrudan** Item'larını gösterir (alt düğümlerinkini göstermez).
+- Üst çubuk: solda görünen değerler üzerinde çalışan **arama/filtre kutusu**, sağda **"New"** butonu. Düğüm Card tipliyse ve Card disable edilmemişse "New" görünür ve Item formunu (3.7.5) modal olarak açar; düğüm "Folder" ise veya Card disable edilmişse "New" gösterilmez.
+- **Kolonlar:** Seçili düğümün Card'ına ait değer taşıyan Property'ler `sort_order` sırasıyla kolon olur (Label başlık). **Tab ve Separator dahil edilmez; Visibility = Hide olanlar gizlenir** (Private bu fazda Show gibi davranır). Gösterim: Icon → ikon; CheckBox → işaret/boş kutu; Percent → değer + "%"; Hex → saklanan hâliyle; diğerleri metin.
+- **Date gösterimi:** saatsiz Date kolonu `YYYY-MM-DD`; saatli Date kolonu `YYYY-MM-DD hh:mm:ss` (ISO değerdeki `T` yerine boşluk). Arama, ekranda görünen bu biçimler üzerinde çalışır; sıralama ISO değerle yapılır.
+- **Çok satırlı Text:** satır sonları boşluk gibi gösterilerek tek satıra indirgenir, taşan kısım `…` ile kısaltılır; tam değer hücre üzerine gelince ipucunda (tooltip) görünür.
+- Satır başında sürükleme tutacağı, en sağda **kalem** ve **çöp kutusu** ikonları bulunur. Satırlar sürükle-bırak ile **yalnızca aynı düğüm içinde** yeniden sıralanır (`items.sort_order`, kalıcı, tek transaction); Item'ı başka düğüme/klasöre taşımak **mümkün değildir** (ileride kurallarıyla tanımlanacak). Kalem, Item formunu mevcut değerlerle açar; Card disable edilmişse kalem devre dışıdır (ipucu: "This Card is disabled"). Çöp kutusu onay modalı ("This Item will be permanently deleted. This action cannot be undone.") sonrası Item ve ItemValue'ları kalıcı siler.
+- **Boş durumlar (İngilizce):** hiç Project yoksa "No projects yet" + New Project çağrısı; düğüm seçili değilse "Select a node from the Item-Tree"; Folder seçiliyse "This node is a Folder. Select a Card node to see its Items."; Item yoksa "No Items yet"; arama sonucu boşsa "No Items match your search". Yüklenirken loading-state gösterilir.
+
+**3.7.5 Item formu (New / Edit) — modal**
+- Form, düğümün Card'ının Property'lerini `sort_order` sırasıyla gösterir. **Tab** Property'leri sekmeleri oluşturur: ilk Tab'den önce kalan alanlar otomatik **"Main"** sekmesine, her Tab'in sonrasındaki alanlar o Tab'in Label'ıyla adlanan sekmeye girer (Tab yoksa tek sekme; sekme çubuğu gösterilmez). **Separator** Label'ı alt başlık olarak ve altına yatay çizgiyle gösterilir; değer taşımaz. Visibility = Hide olan Property'ler tabloda gizlenir ama formda **gösterilir**; Key ve Private bu fazda işlevsizdir.
+- **Yerleşim:** Her alan tek satırdadır: solda **Label** (~%30–35 genişlik; uzun Label kendi sütununda alt satıra kırılır), sağda **giriş alanı**. Separator ve sekme çubuğu tam genişliktedir. Yüksek denetimler (Enum type-ahead açılır listesi, Icon seçici, çok satırlı Text) sağ sütunda açılır. Dar ekranlarda (≈500px altı) Label giriş alanının üstüne yığılır.
+- **Giriş denetimleri:**
+  - **Text:** Property'nin `max_length` değerine göre: **≤ 100** → tek satırlı `input type="text"` (satır sonları boşluğa çevrilir); **> 100** → çok satırlı `textarea` (başlangıçta 3 satır, dikey yeniden boyutlandırılabilir; satır sonu ve tab korunur, diğer kontrol karakterleri temizlenir). Mevcut değer satır sonu içeriyorsa alan `textarea` açılır. Alanın altında/yanında **"12/255"** biçiminde canlı karakter sayacı bulunur (satır sonları dahil sayılır); limite ulaşılınca yazma durur ve sayaç kırmızıya döner; yapıştırılan metin limitte kesilir. `max_length` sonradan düşürülürse mevcut değerler silinmez/kesilmez; düzenlerken sayaç kırmızı görünür ve değer limite indirilmeden kayıt yapılamaz.
+  - **Number:** Card ayarına göre Integer/Decimal. **Percent:** sayı kutusu + yanında "%" işareti (slider yok). **CheckBox:** onay kutusu, yeni Item'da başlangıç değeri Card'daki "Default value". **Icon:** gömülü ikon seçici (kategorili). **Hex:** giriş alanı `0x` ön ekiyle dolu gelir, ön ek silinemez/değiştirilemez; kayıtta küçük harfe normalize edilir.
+  - **Date:** tarayıcının yerleşik seçicisi yerine **maskeli metin kutusu** + yanında takvim butonu; takvimden seçim aynı biçimde kutuya yazılır. "Include time" kapalıysa `DD-MM-YYYY`, açıksa `DD-MM-YYYY hh:mm:ss` (24 saat). Saklama ISO 8601 olarak kalır (`YYYY-MM-DD` / `YYYY-MM-DDTHH:mm:ss`).
+  - **Enum:** Type-ahead (Ekran Görüntüsü 4 referansı): arama kutusu + öneri listesi (kullanım sayısıyla). Öneriler **yalnızca o Property'ye özeldir**. Listede olmayan yeni değer kaydedilirse o Property'nin önerilerine otomatik eklenir (case-insensitive tekilleştirme, ilk girilen biçim saklanır); seçilen/girilen her değer için `usage_count` artar.
+- Tüm alanlar **opsiyoneldir**: boş alan için ItemValue kaydı oluşturulmaz (yalnızca `0x` içeren Hex boş sayılır).
+- Doğrulama hem arayüzde (alan bazlı, anlık, İngilizce) hem adapter'da (kayıt öncesi) uygulanır; geçersiz alan varken kayıt yapılamaz (kurallar için bkz. 8.1). "Save"/"Cancel" butonları bulunur; kayıt sonrası dosya diske otomatik yazılır ve tablo güncellenir.
 
 ## 4. Kullanıcı Akışları
 
@@ -107,10 +145,17 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 3. Değişiklikler kaydedilir, dosya otomatik yazılır, tablo güncellenir.
 
 **Akış D — Card devre dışı bırakma / kalıcı silme**
-1. "Del" butonu → onay modalı → onaylanırsa Card `disabled` olur, tabloda soluk görünür, ilgili Item görünümleri gizlenir.
+1. "Del" butonu → onay modalı → onaylanırsa Card `disabled` olur, tabloda soluk görünür; Items sayfasında bağlı düğümlerde "New" gizlenir ve Item düzenleme devre dışı kalır.
 2. Disable edilmiş Card için "Purge" veya "Recover" seçenekleri görünür.
-3. "Purge" → onay modalı → onaylanırsa Card ve bağlı tüm Item'lar kalıcı olarak (cascade ile) silinir.
+3. "Purge" (yalnızca Card'a bağlı Item yoksa aktiftir) → onay modalı → onaylanırsa Card kalıcı silinir; bağlı düğümler "Folder" tipine döner.
 4. "Recover" → Card tekrar aktif olur, soluk görünüm kalkar.
+
+**Akış F — Items sayfasında Item oluşturma**
+1. Kullanıcı Items tabına geçer; "New Project" ile bir Project (kök düğüm) oluşturur ve Project dropdown'ında seçer.
+2. Ağaçta + ikonuyla alt düğümler ekler; her düğümde Type'ı sorulur (Folder veya bir Card).
+3. Card tipli bir düğümü seçer; sağda Items tablosu açılır ve "New" butonu görünür.
+4. "New" ile Card'ın formunu modalda doldurur ("Save"); doğrulama geçerse Item tabloya eklenir ve dosya diske yazılır.
+5. Satırları sürükle-bırak ile sıralar; kalem ile düzenler, çöp kutusu ile (onaylı) kalıcı siler.
 
 **Akış E — Veritabanı değiştirme**
 1. Kullanıcı header'daki "Switch Database" butonuna tıklar.
@@ -131,7 +176,7 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 - **Versiyonlama:** Versiyon numarası header'daki rozette gösterilir ve kodda tek bir sabitte tutulur; başlangıç değeri ve sonraki numaralar geliştirme tarafında belirlenir (bu prompt'ta numara atanmaz). Mantık: her güncellemede RC numarası bir artırılır; ilk kararlı sürüm yayınlandığında adlandırma `v1.0` olur.
 - **Kapsam dışı (bu faz için):** Authentication, RLS (row-level security), gerçek zamanlı senkronizasyon, çoklu kullanıcı/CoWork paylaşımı — bunlar Supabase fazına ertelenir.
 
-## 6. Veri Modeli (Faz-1 kapsamı)
+## 6. Veri Modeli
 
 > Aşağıdaki `CREATE TABLE` ifadeleri `index.html` içinde tek bir yorumla sınırlandırılmış şema bloğunda toplanmalıdır.
 
@@ -158,7 +203,8 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
   - date: `{"include_time":true|false}`
   - percent: `{"min":<int>,"max":<int>}`
   - checkbox: `{"default":true|false}`
-  - icon / text / enum / tab / separator: `null`
+  - text: `{"max_length":<int 1-4000>}` (yoksa 255 varsayılır)
+  - icon / enum / tab / separator: `null`
 - `is_key` INTEGER NOT NULL DEFAULT 0 (Faz-1'de işlevsiz, yalnızca saklanır; tab/separator için her zaman 0)
 - `visibility` TEXT NOT NULL DEFAULT `'show'` (`show` | `hide` | `private`; Faz-1'de işlevsiz; tab/separator için her zaman `'show'`)
 - `sort_order` INTEGER NOT NULL (`order` SQL'de ayrılmış kelime olduğu için bu isim kullanılır)
@@ -173,16 +219,28 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 - `created_at` TEXT NOT NULL
 - **UNIQUE** (`property_id`, `value_normalized`)
 
-**Item** *(Faz-1'de yalnızca şema)*
-- `id` TEXT PRIMARY KEY, `card_id` TEXT NOT NULL (FK, `ON DELETE CASCADE`), `user_id` TEXT NOT NULL DEFAULT `'sqlite'`, `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL
+**Node** (`nodes` — Item-Tree düğümleri / Project'ler)
+- `id` TEXT PRIMARY KEY (`crypto.randomUUID()`)
+- `user_id` TEXT NOT NULL DEFAULT `'sqlite'`
+- `parent_id` TEXT NULL (FK → nodes.id, `ON DELETE CASCADE`; NULL = kök/Project)
+- `name` TEXT NOT NULL (max 255, trim; tekil olmak zorunda değil)
+- `card_id` TEXT NULL (FK → cards.id, `ON DELETE SET NULL`; NULL = "Folder" tipi, dolu = o Card'a bağlı)
+- `sort_order` INTEGER NOT NULL (aynı `parent_id` altındaki kardeşler arasında; kökler için `parent_id IS NULL` grubu)
+- `created_at`, `updated_at` TEXT NOT NULL (ISO 8601)
 
-**ItemValue** *(Faz-1'de yalnızca şema)*
+**Item**
+- `id` TEXT PRIMARY KEY, `card_id` TEXT NOT NULL (FK → cards.id, `ON DELETE CASCADE`), `node_id` TEXT NOT NULL (FK → nodes.id, `ON DELETE CASCADE`), `user_id` TEXT NOT NULL DEFAULT `'sqlite'`, `sort_order` INTEGER NOT NULL (aynı düğüm içindeki sıra), `created_at` TEXT NOT NULL, `updated_at` TEXT NOT NULL
+
+**ItemValue**
 - `id` TEXT PRIMARY KEY, `item_id` TEXT NOT NULL (FK, `ON DELETE CASCADE`), `property_id` TEXT NOT NULL (FK), `value` TEXT
 - `value` kolonu tüm tipler için TEXT olarak kalır (Tab ve Separator değer taşımadığı için ItemValue kaydı oluşturmaz; CheckBox `0`/`1`, Percent tam sayı metni olarak saklanır); Hex değerleri `0x` ön ekiyle ve küçük harfe normalize edilmiş olarak saklanır (ör. `0x1a2f`).
 
 **Silme davranışları:**
 - **Disable** (Del): `UPDATE cards SET is_disabled = 1 WHERE id = ?`. Cascade yoktur.
-- **Purge:** Card kaydının gerçek `DELETE`'idir. Property, EnumValue, Item, ItemValue tabloları `ON DELETE CASCADE` ile Card'a bağlıdır; Card purge edildiğinde bağlı tüm alt kayıtlar otomatik silinir.
+- **Purge (Card):** Card kaydının gerçek `DELETE`'idir ve **yalnızca Card'a bağlı Item yoksa** yapılabilir (UI'da devre dışı; adapter'da da engellenir). Property ve EnumValue kayıtları `ON DELETE CASCADE` ile silinir; Card'a bağlı düğümlerin `card_id`'si `NULL` olur (düğümler "Folder"a döner).
+- **Düğüm silme:** Düğüm, tüm alt ağacı ve bu düğümlerdeki Item/ItemValue kayıtları (`ON DELETE CASCADE`) tek transaction'da kalıcı silinir.
+- **Item silme:** Onay sonrası Item ve ItemValue'ları kalıcı silinir (disable kavramı yoktur).
+- **Geriye dönük uyumluluk:** Önceki sürümlerle oluşturulmuş `.sqlite` dosyaları açılırken şema idempotent biçimde yükseltilir (`CREATE TABLE IF NOT EXISTS nodes`; eski dosyalarda boş olan `items` tablosu yeni kolonlarla yeniden oluşturulabilir). Dosya açılışı hata vermemelidir.
 
 ## 7. Arayüz / UX Notları
 - Header ve tab menüsü tasarımı, Ekler bölümündeki ekran görüntülerinin genel yerleşim mantığına (logo + isim + versiyon solda, altında tab menüsü) görsel referans olarak uygulanmalıdır.
@@ -190,6 +248,7 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 - Card Name alanı: kullanıcı yazarken canlı doğrulama (kırmızı/yeşil, boşluksuz + case-insensitive karşılaştırma).
 - Title alanı: New Card modalında Card Name'den otomatik doldurma davranışı.
 - Tema desteği (dark/light), header'daki bağımsız ikon buton ile toggle edilebilir; seçim kalıcı olmalı (localStorage).
+- Items sayfası: iki panelli File Explorer görünümü (bkz. 3.7); sayfa kaymaz, paneller kendi içinde kayar. Item formunda Label solda / giriş sağda tek satır yerleşimi kullanılır.
 - **Marka Kimliği:**
   - **Logo:** "Stacked cards" konsepti — üç adet üst üste, diyagonal kaydırılmış yuvarlak köşeli dikdörtgen; sırasıyla arkadan öne **indigo (#4F46E5)**, **teal (#0D9488)**, **coral (#F97316)** renkleriyle doldurulur. Gömülü SVG olarak header'da wordmark'ın solunda kullanılır (referans: `CMAP-Logo.svg`).
   - **Slogan:** "Your records, unlimited relationships." — wordmark'ın altında/yanında, ikincil (muted) metin rengiyle gösterilir.
@@ -197,7 +256,7 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 ## 8. Güvenlik ve Gizlilik Gereksinimleri
 - Faz-1'de kimlik doğrulama veya sunucu tarafı erişim kontrolü **yoktur**; veri erişimi, kullanıcının kendi diskindeki `.sqlite` dosyasıyla sınırlıdır. Dosya sistemi izinleri (File System Access API izin diyalogları) tamamen tarayıcı tarafından yönetilir; uygulama bu izinleri varsayamaz, her zaman izin reddi senaryosunu ele almalıdır (bkz. Bölüm 9).
 - **Gelecek faz notu:** Supabase'e geçişte RLS politikaları `user_id = auth.uid()` temelinde uygulanacak ve CoWork paylaşım mekanizması (`card_access` tablosu) eklenecektir; bu, Bölüm 6'daki `user_id` placeholder kolonu ve adapter soyutlaması sayesinde UI katmanına dokunmadan yapılabilmelidir. Faz-1'de bu uygulanmaz.
-- **Girdi temizleme / injection koruması:** Tüm metin girdileri (Card Name, Title, Description, Template, Property Label, Enum değerleri, filtre/arama alanı ve ileride Item değerleri) zararlı kod enjeksiyonuna karşı temizlenmelidir:
+- **Girdi temizleme / injection koruması:** Tüm metin girdileri (Card Name, Title, Description, Template, Property Label, Enum değerleri, düğüm adları, Item değerleri, filtre/arama alanları) zararlı kod enjeksiyonuna karşı temizlenmelidir:
   - Tüm SQL sorguları **parametreli** (prepared statement / bind parametresi) olmalı; kullanıcı girdisinin SQL string'ine birleştirilmesi yasaktır (filtre/arama alanındaki `LIKE` sorguları dahil).
   - Kullanıcıdan gelen veya veritabanından okunan hiçbir metin `innerHTML` ile ekrana basılmamalı; `textContent` kullanılmalı veya çıktı HTML-escape edilmelidir.
   - Kaydetmeden önce metinlerden **kontrol karakterleri** temizlenmelidir (Text area alanlarında satır sonu/tab korunur).
@@ -214,16 +273,18 @@ CMAP, kullanıcıların kendi tanımladıkları dinamik "Card" şablonları (for
 | Template | Hayır | Sınırsız | Serbest metin |
 | Property Label | Evet | 255 | Trim |
 | Enum değeri | Evet (Item girişinde) | 255 | Trim; case-insensitive tekilleştirme (property'ye özel) |
+| Düğüm adı (Item-Tree) | Evet | 255 | Trim; tekil olmak zorunda değil |
+| Text Item değeri | Hayır | Property'nin `max_length` değeri (1–4000, varsayılan 255) | Trim; ≤ 100 ise satır sonu yok |
 
-### 8.1 Item Fazında Uygulanacak Doğrulama Şartnamesi (Faz-1'de UYGULANMAZ, yalnızca şartname)
-Item ekleme/düzenleme arayüzü Faz-1 dışındadır. Item fazında geliştirilecek formlar, her Property tipi için değeri kaydetmeden önce şu kurallarla doğrulamalı ve hata durumunda İngilizce, alan bazlı mesaj göstermelidir:
+### 8.1 Item Formu Doğrulama Kuralları
+Item formu, her Property tipi için değeri kaydetmeden önce şu kurallarla doğrulamalı ve hata durumunda İngilizce, alan bazlı mesaj göstermelidir:
 
 | Tip | Geçerlilik kuralı |
 |---|---|
-| Text | Trim uygulanır, kontrol karakterleri temizlenir. |
+| Text | Trim uygulanır, kontrol karakterleri temizlenir (çok satırlı alanlarda satır sonu ve tab korunur); uzunluk Property'nin `max_length` değerini (varsayılan 255) aşamaz; `max_length` ≤ 100 ise satır sonu içeremez. |
 | Number | Config'teki türe uyar: `integer` için yalnızca tam sayı; `decimal` için nokta ayraçlı ondalık sayı. Sayısal olmayan girdi reddedilir. |
 | Hex | Giriş alanı `0x` ön ekiyle dolu gelir. Ön ek zorunludur; ondan sonra yalnızca `0-9`, `a-f`, `A-F` karakterleri ve en az 1 hane olmalıdır. Hane sayısı (ön ek hariç) Config'teki min/max sınırları içinde olmalıdır. Kayıtta ön ek `0x` ve tüm harfler **küçük harfe** normalize edilir. |
-| Date | Geçerli bir takvim tarihi olmalıdır; Config'te `include_time` açıksa geçerli bir saat de zorunludur. |
+| Date | Giriş `DD-MM-YYYY` veya (Include time açıksa) `DD-MM-YYYY hh:mm:ss`; gerçek takvim tarihi (ör. 31-02-2025 geçersiz) ve geçerli saat (00–23, 00–59, 00–59); ISO 8601 olarak saklanır (`YYYY-MM-DD` / `YYYY-MM-DDTHH:mm:ss`). |
 | Enum | Boş olamaz, max 255 karakter, trim; Property'ye özel type-ahead kuralları geçerlidir. |
 | Icon | Değer, gömülü ikon setindeki geçerli bir anahtar olmalıdır. |
 | Tab | Değer taşımaz; doğrulama yok. Label yalnızca görüntülenir. |
@@ -238,6 +299,7 @@ Doğrulama hem arayüzde (anlık geri bildirim) hem adapter katmanında (kayıt 
 - File System Access API desteklenmeyen tarayıcılarda otomatik kaydetme yapılamayacağı kullanıcıya açıkça belirtilmeli; Blob/download + file-input fallback akışı devreye girmeli.
 - Bir Card silinirken/purge edilirken işlem yarıda kesilirse veri tutarsızlığı oluşturmayacak şekilde (tek SQL transaction'ı içinde) uygulanmalı.
 - Purge onayı tek adımlı bir modal ile alınır; ek bir ikincil onay adımına gerek yoktur.
+- Çok adımlı Items işlemleri (düğüm taşıma, alt ağaç silme, sıralama, Item + ItemValue + EnumValue yazımı) tek SQL transaction'ı içinde yapılır; her işlemden sonra dosya diske yazılır.
 - Properties listesi boş bir Card kaydedilebilir; ayrıca bir uyarı mesajına gerek yoktur.
 - Enum type-ahead önerileri boşken ayrıca bir empty-state mesajına gerek yoktur.
 
@@ -260,11 +322,20 @@ Doğrulama hem arayüzde (anlık geri bildirim) hem adapter katmanında (kayıt 
 - [ ] Önceki sürümlerle oluşturulmuş bir `.sqlite` dosyası sorunsuz açılıyor (geriye dönük uyumluluk).
 - [ ] Number/Hex/Date tipleri seçildiğinde tipe özel ayarlar (Integer/Decimal, Min/Max length, Include time) Card tanımı ekranında görünüyor ve `config` alanında saklanıyor; Hex Min/Max doğrulaması (pozitif tam sayı, Min ≤ Max) çalışıyor.
 - [ ] Enum type-ahead öneri sistemi Property'ye özel ve case-insensitive tekilleştirme ile çalışıyor.
-- [ ] Del → onay modalı → disable (cascade yok); Purge → onay modalı → gerçek DELETE (cascade ile Property/EnumValue/Item/ItemValue silinir); Recover çalışıyor.
+- [ ] Del → onay modalı → disable (cascade yok); Purge → onay modalı → gerçek DELETE (yalnızca Item'ı olmayan Card; Property/EnumValue cascade ile silinir, bağlı düğümler Folder'a döner); Item'ı olan Card'da Purge devre dışı + ipucu; Recover çalışıyor.
 - [ ] Tüm CRUD işlemleri UI'dan doğrudan değil, tek bir adapter bloğu üzerinden yapılıyor (kod incelemesiyle doğrulanabilir).
 - [ ] Şema (`CREATE TABLE` ifadeleri) tek bir yorumla ayrılmış blokta toplanmış; `AUTOINCREMENT`/`PRAGMA` kullanılmamış; tüm ID'ler `TEXT` UUID, tüm timestamp'ler ISO 8601 string.
-- [ ] Tüm metin girdileri parametreli sorgularla yazılıyor, ekrana `textContent`/escape ile basılıyor, kontrol karakterleri temizleniyor; açılan `.sqlite` dosyasındaki içerik de güvenli render ediliyor.
-- [ ] Bölüm 8.1'deki Item doğrulama şartnamesi kod içinde (adapter/doğrulama bölümünde) yorum veya yapılandırma olarak not edilmiş; Faz-1'de Item formu geliştirilmemiş.
+- [ ] Tüm metin girdileri (düğüm adları, Item değerleri, tooltip metinleri dahil) parametreli sorgularla yazılıyor, ekrana `textContent`/escape ile basılıyor, kontrol karakterleri temizleniyor; açılan `.sqlite` dosyasındaki içerik de güvenli render ediliyor.
+- [ ] Items tabı iki panel gösteriyor (~%30 "Item-Tree", ~%70 "Items"); sayfa kaymıyor, paneller kendi içinde dikey kayıyor; Map tabı "Coming soon".
+- [ ] "New Project", "Project:" dropdown'ı, kökte dahil +/kalem/çöp ikonları, düğüm formu (Name zorunlu max 255; Type varsayılan Folder, disable edilmiş Card'lar listelenmiyor; Item'ı olan düğümün tipi kilitli), düğüm adlarının tekil olmak zorunda olmaması çalışıyor.
+- [ ] Ağaçta sürükle-bırak (alt düğüm yapma, sıralama, kendi alt ağacına bırakmanın engellenmesi, kök düğümlerin sürüklenememesi, kalıcılık) ve düğüm silme (alt düğüm/Item sayısı gösteren onay, tüm alt ağacın kalıcı silinmesi) çalışıyor; aç/kapa, seçili düğüm ve Project localStorage'dan geri yükleniyor.
+- [ ] Items tablosu seçili düğümün doğrudan Item'larını Card Property'leriyle (Tab/Separator ve Hide hariç) gösteriyor; arama çalışıyor; "New" yalnızca aktif Card'a bağlı düğümde görünüyor; disable edilmiş Card'da tablo görünüyor, kalem devre dışı; satırlar aynı düğüm içinde sürüklenerek sıralanıyor ve sıra kalıcı; Item silme onaylı ve kalıcı.
+- [ ] Item formu: Tab'ler sekme, Separator alt başlık+çizgi olarak render ediliyor; Label solda / giriş sağda tek satır yerleşimi (dar ekranda üstte); tüm tip denetimleri (Hex `0x` ön eki, Percent "%", CheckBox varsayılanı, Icon seçici, Enum type-ahead) çalışıyor.
+- [ ] Text: "Max length" ayarı (1–4000, varsayılan 255; eski Property'lerde 255 varsayımı); `max_length` ≤ 100 tek satırlı input, > 100 textarea; "n/max" sayacı canlı, limitte yazma duruyor ve sayaç kırmızı, yapıştırma limitte kesiliyor; adapter limit aşımını reddediyor; limiti sonradan düşürülmüş Card'ın Item'ları değişmiyor ama düzenlerken limit aşıldıkça kayıt yapılamıyor.
+- [ ] Date: maskeli metin kutusu + takvim butonu (`DD-MM-YYYY` / `DD-MM-YYYY hh:mm:ss`), geçersiz tarih/saat reddediliyor, ISO 8601 saklanıyor; tabloda saatsiz Date `YYYY-MM-DD`, saatli `YYYY-MM-DD hh:mm:ss` görünüyor.
+- [ ] Bölüm 8.1'deki doğrulama kuralları Item formunda hem arayüzde hem adapter'da uygulanıyor.
+- [ ] Cards tablosundaki "# of Records" gerçek Item sayısını gösteriyor.
+- [ ] Önceki sürümlerle oluşturulmuş `.sqlite` dosyaları sorunsuz açılıyor (şema idempotent yükseltilir).
 - [ ] Bölüm 8'deki tüm girdi doğrulama kuralları uygulanmış.
 - [ ] Empty-state ve loading-state'ler uygulanmış.
 - [ ] Uygulama GitHub Pages üzerinde deploy edilebiliyor; repo public, tek dosya `index.html` (sql.js CDN script dahil, inline CSS/JS), kökte `README.md`.
