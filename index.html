@@ -361,6 +361,8 @@ textarea.field.template{ min-height:90px; font-family:var(--font-mono); font-siz
 .props-table .input-text.opt-num{ width:52px; text-align:right; font-family:var(--font-mono); }
 .opt-sep, .opt-unit{ font-family:var(--font-mono); font-size:11px; color:var(--muted); }
 .opt-check{ display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11.5px; color:var(--text); cursor:pointer; user-select:none; white-space:nowrap; }
+.props-table tr.row-layout input[data-field="label"]{ font-weight:600; }
+.props-table tr.row-tab td{ background:color-mix(in srgb, var(--accent) 5%, transparent); }
 .opt-none{ color:var(--muted); font-family:var(--font-mono); font-size:11px; padding-left:4px; }
 .props-table input[type="checkbox"]{ accent-color:var(--accent); cursor:pointer; margin:0; }
 .ord-btns{ display:inline-flex; gap:4px; align-items:center; }
@@ -444,7 +446,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC5</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC6</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -583,7 +585,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 
 </main>
 
-<footer>CMAP v1.0.RC5</footer>
+<footer>CMAP v1.0.RC6</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -670,7 +672,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC5
+   CMAP v1.0.RC6
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -680,7 +682,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC5';
+const APP_VERSION     = '1.0.RC6';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
@@ -696,9 +698,13 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
     - properties.config is a JSON string with type-specific settings → may become `jsonb` in Postgres:
         number → {"kind":"integer"} | {"kind":"decimal"}
         hex    → {"min_length":<int|null>,"max_length":<int|null>}   (hex digits, "0x" excluded)
-        date   → {"include_time":true|false}
-        icon / text / enum → NULL
-    - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f).
+        date     → {"include_time":true|false}
+        percent  → {"min":<int 0–100>,"max":<int 0–100>}
+        checkbox → {"default":true|false}
+        icon / text / enum / tab / separator → NULL
+    - tab / separator carry no value: is_key is always 0 and visibility always 'show'.
+    - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f;
+      checkbox stored as '0' / '1').
   Future (Supabase phase, not created here):
     -- card_access (card_id, grantee_user_id, permission 'read'|'write') for CoWork sharing.
 */
@@ -725,7 +731,7 @@ CREATE TABLE IF NOT EXISTS cards (
 CREATE TABLE IF NOT EXISTS properties (
   id          TEXT PRIMARY KEY,
   card_id     TEXT NOT NULL REFERENCES cards (id) ON DELETE CASCADE,
-  type        TEXT NOT NULL CHECK (type IN ('icon', 'text', 'number', 'hex', 'enum', 'date')),
+  type        TEXT NOT NULL CHECK (type IN ('icon', 'text', 'number', 'hex', 'enum', 'date', 'tab', 'separator', 'percent', 'checkbox')),
   label       TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 255),
   config      TEXT,
   is_key      INTEGER NOT NULL DEFAULT 0 CHECK (is_key IN (0, 1)),
@@ -772,9 +778,12 @@ CREATE TABLE IF NOT EXISTS item_values (
   db.run()/db.exec() directly. In the Supabase phase, the bodies of these
   functions are replaced with Supabase client calls; their signatures stay.
 */
-const SCHEMA_VERSION = 2;   // 1 = RC1–RC4, 2 = RC5 (hex type + properties.config)
+const SCHEMA_VERSION = 3;   // 1 = RC1–RC4, 2 = RC5 (hex + properties.config), 3 = RC6 (tab, separator, percent, checkbox)
 const USER_ID = 'sqlite';
-const PROPERTY_TYPES = ['icon', 'text', 'number', 'hex', 'enum', 'date'];
+const PROPERTY_TYPES = ['icon', 'text', 'number', 'hex', 'enum', 'date', 'tab', 'separator', 'percent', 'checkbox'];
+/** Layout-only types: no value, not counted as properties, no Key / Visibility. */
+const LAYOUT_TYPES = ['tab', 'separator'];
+function isLayoutType(t){ return LAYOUT_TYPES.includes(t); }
 const VISIBILITIES = ['show', 'hide', 'private'];
 const MAX_LEN = 255;
 
@@ -880,21 +889,33 @@ function propertiesDdl(tableName){
   const m = SCHEMA_SQL.match(/CREATE TABLE IF NOT EXISTS properties \([\s\S]*?\n\);/);
   return m[0].replace('CREATE TABLE IF NOT EXISTS properties (', `CREATE TABLE ${tableName} (`);
 }
+/* SQLite can't change a CHECK constraint in place, so the properties table is rebuilt with the
+   current definition (official 12-step procedure). Both copy statements are fixed strings. */
+const COPY_PROPERTIES_SQL = {
+  // v1 rows have no config column: give number/date their default settings.
+  fromV1: `INSERT INTO properties_new (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
+           SELECT id, card_id, type, label,
+                  CASE type WHEN 'number' THEN '{"kind":"integer"}'
+                            WHEN 'date'   THEN '{"include_time":false}'
+                            ELSE NULL END,
+                  is_key, visibility, sort_order, created_at, updated_at
+           FROM properties`,
+  // v2+ rows already have config: copy unchanged.
+  asIs:   `INSERT INTO properties_new (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
+           SELECT id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at
+           FROM properties`,
+};
+function rebuildPropertiesTable(copySql){
+  db.exec(propertiesDdl('properties_new'));
+  exec(copySql);
+  exec('DROP TABLE properties');
+  exec('ALTER TABLE properties_new RENAME TO properties');
+}
 const MIGRATIONS = {
-  // v2 (RC5): 'hex' type + properties.config. SQLite can't change a CHECK constraint in place,
-  // so the table is rebuilt (official 12-step procedure) and existing rows get default configs.
-  2(){
-    db.exec(propertiesDdl('properties_v2'));
-    exec(`INSERT INTO properties_v2 (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
-          SELECT id, card_id, type, label,
-                 CASE type WHEN 'number' THEN '{"kind":"integer"}'
-                           WHEN 'date'   THEN '{"include_time":false}'
-                           ELSE NULL END,
-                 is_key, visibility, sort_order, created_at, updated_at
-          FROM properties`);
-    exec('DROP TABLE properties');
-    exec('ALTER TABLE properties_v2 RENAME TO properties');
-  },
+  // v2 (RC5): 'hex' type + properties.config.
+  2(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.fromV1); },
+  // v3 (RC6): 'tab', 'separator', 'percent', 'checkbox' types. Existing data is copied unchanged.
+  3(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.asIs); },
 };
 function dbMigrate(fromVersion){
   // Foreign keys must be off while a referenced table is rebuilt, otherwise dropping it
@@ -951,9 +972,10 @@ function cleanPropertyInput(p){
   if (!label) throw new CmapError('invalid', 'Every property needs a label.');
   if (label.length > MAX_LEN) throw new CmapError('invalid', 'Property labels can be at most 255 characters.');
   if (!PROPERTY_TYPES.includes(p.type)) throw new CmapError('invalid', 'Unknown property type.');
-  const visibility = VISIBILITIES.includes(p.visibility) ? p.visibility : 'show';
+  const layout = isLayoutType(p.type);
+  const visibility = layout ? 'show' : (VISIBILITIES.includes(p.visibility) ? p.visibility : 'show');
   const config = validatePropertyConfig(p.type, p.config, label);
-  return { type: p.type, label, is_key: p.is_key ? 1 : 0, visibility, config: config == null ? null : JSON.stringify(config) };
+  return { type: p.type, label, is_key: !layout && p.is_key ? 1 : 0, visibility, config: config == null ? null : JSON.stringify(config) };
 }
 
 /* ---------- Type-specific property settings (properties.config) ---------- */
@@ -961,7 +983,15 @@ function defaultPropertyConfig(type){
   if (type === 'number') return { kind: 'integer' };
   if (type === 'hex') return { min_length: null, max_length: null };
   if (type === 'date') return { include_time: false };
+  if (type === 'percent') return { min: 0, max: 100 };
+  if (type === 'checkbox') return { default: false };
   return null;
+}
+/** Parses a percent bound: a whole number from 0 to 100 (required). */
+function parsePercentBound(v){
+  const s = v == null ? '' : String(v).trim();
+  if (!/^\d+$/.test(s) || Number(s) > 100) return { error: 'must be a whole number from 0 to 100' };
+  return { value: Number(s) };
 }
 /** Parses a hex length limit: '' / null → null; otherwise a positive whole number or an error string. */
 function parseHexLength(v){
@@ -987,6 +1017,17 @@ function validatePropertyConfig(type, config, label = 'this property'){
     return { min_length: mn.value, max_length: mx.value };
   }
   if (type === 'date') return { include_time: c.include_time === true };
+  if (type === 'percent'){
+    const mn = parsePercentBound(c.min == null ? 0 : c.min), mx = parsePercentBound(c.max == null ? 100 : c.max);
+    if (mn.error) throw new CmapError('invalid', `Min of "${label}" ${mn.error}.`);
+    if (mx.error) throw new CmapError('invalid', `Max of "${label}" ${mx.error}.`);
+    if (mn.value > mx.value) throw new CmapError('invalid', `Min of "${label}" can\u2019t be greater than its max.`);
+    return { min: mn.value, max: mx.value };
+  }
+  if (type === 'checkbox'){
+    if (c.default != null && typeof c.default !== 'boolean') throw new CmapError('invalid', `Default value of "${label}" must be Checked or Unchecked.`);
+    return { default: c.default === true };
+  }
   return null;
 }
 /** Reads a stored config defensively (the file may come from anywhere). Falls back to defaults. */
@@ -1011,13 +1052,28 @@ const ITEM_VALUE_RULES = Object.freeze({
             mustBe: 'a real calendar date; time required when include_time' },
   enum:   { required: true, maxLength: 255, trim: true, dedupe: 'case-insensitive, per property (upsertEnumValue)' },
   icon:   { mustBe: 'a key of the embedded ICON_SET (iconExists)' },
+  tab:       { carriesValue: false, validation: 'none; the label is only displayed (as text, never HTML)' },
+  separator: { carriesValue: false, validation: 'none; the label is only displayed (as text, never HTML)' },
+  percent:   { integer: /^[+-]?\d+$/, reject: 'decimals and anything non-numeric', rangeFrom: 'config.min..config.max (inclusive)',
+               input: 'number box with a "%" sign next to it; no slider' },
+  checkbox:  { accepts: [true, false], storeAs: "'1' / '0'", initialValue: 'config.default for a new Item' },
 });
+
+/* ---------- TAB LAYOUT SPEC — Item phase, NOT rendered in Phase-1 ----------
+   Properties are processed in sort_order:
+   - Everything before the first 'tab' property goes into a fixed tab named "Main" (not stored, not renamable).
+   - Each 'tab' property opens a new tab (its label is the tab name) holding the properties after it,
+     up to the next 'tab' or the end of the list.
+     e.g. [text, hex, tab "data", hex2] → Main: text, hex · data: hex2
+   - With no 'tab' property there is a single "Main" tab; whether a tab bar is shown is decided in the Item phase.
+   - 'separator' renders its label as a subheading with a horizontal rule under it. */
+const MAIN_TAB_NAME = 'Main';
 
 /* ---------- Cards ---------- */
 function readCards(){
   return q(`
     SELECT c.id, c.name, c.title, c.description, c.is_disabled, c.created_at, c.updated_at,
-           (SELECT COUNT(*) FROM properties p WHERE p.card_id = c.id) AS property_count,
+           (SELECT COUNT(*) FROM properties p WHERE p.card_id = c.id AND p.type NOT IN ('tab', 'separator')) AS property_count,
            (SELECT COUNT(*) FROM items i WHERE i.card_id = c.id)      AS record_count
     FROM cards c
     WHERE c.user_id = ?
@@ -1799,7 +1855,8 @@ async function onRowAction(action, id){
 }
 
 /* ---------- Card modal ---------- */
-const TYPE_LABELS = { icon: 'Icon', text: 'Text', number: 'Number', hex: 'Hex', enum: 'Enum', date: 'Date' };
+const TYPE_LABELS = { icon: 'Icon', text: 'Text', number: 'Number', hex: 'Hex', enum: 'Enum', date: 'Date',
+  tab: 'Tab', separator: 'Separator', percent: '%', checkbox: 'CheckBox' };
 const VIS_LABELS = { show: 'Show', hide: 'Hide', private: 'Private' };
 const form = { mode: 'new', cardId: null, props: [], snapshot: '', attempted: false, seq: 0 };
 
@@ -1832,10 +1889,21 @@ function formSnapshot(){
 function formConfigFrom(type, cfg){
   const c = cfg || defaultPropertyConfig(type);
   if (type === 'hex') return { min_length: c.min_length == null ? '' : String(c.min_length), max_length: c.max_length == null ? '' : String(c.max_length) };
+  if (type === 'percent') return { min: String(c.min), max: String(c.max) };
   return c ? { ...c } : null;
 }
-/** Returns { min, max, order } error flags for a hex property in the form. */
-function hexConfigErrors(p){
+/** Which config keys the shared Min / Max inputs edit, per type. */
+const RANGE_KEYS = { hex: ['min_length', 'max_length'], percent: ['min', 'max'] };
+/** Returns { min, max, msg } error flags for the Min / Max inputs of a hex or percent property. */
+function configErrors(p){
+  if (p.type === 'percent'){
+    const mn = parsePercentBound(p.config.min), mx = parsePercentBound(p.config.max);
+    const order = !mn.error && !mx.error && mn.value > mx.value;
+    return { min: !!mn.error || order, max: !!mx.error || order, msg:
+      mn.error ? '% min must be a whole number from 0 to 100.' :
+      mx.error ? '% max must be a whole number from 0 to 100.' :
+      order ? '% min can\u2019t be greater than max.' : '' };
+  }
   if (p.type !== 'hex') return null;
   const mn = parseHexLength(p.config.min_length), mx = parseHexLength(p.config.max_length);
   const order = !mn.error && !mx.error && mn.value != null && mx.value != null && mn.value > mx.value;
@@ -1854,6 +1922,14 @@ function renderPropOptions(p){
       <input class="input-text opt-num" data-field="cfg-max" type="text" inputmode="numeric" maxlength="6" placeholder="Max" aria-label="Max length" value="${esc(p.config.max_length)}">
       <span class="opt-unit">digits</span></span>`;
   if (p.type === 'date') return `<label class="opt-check"><input type="checkbox" data-field="cfg-time" ${p.config.include_time ? 'checked' : ''}> Include time</label>`;
+  if (p.type === 'percent') return `<span class="opt-hex" title="Allowed range, whole numbers from 0 to 100.">
+      <input class="input-text opt-num" data-field="cfg-min" type="text" inputmode="numeric" maxlength="3" placeholder="0" aria-label="Min" value="${esc(p.config.min)}">
+      <span class="opt-sep">–</span>
+      <input class="input-text opt-num" data-field="cfg-max" type="text" inputmode="numeric" maxlength="3" placeholder="100" aria-label="Max" value="${esc(p.config.max)}">
+      <span class="opt-unit">%</span></span>`;
+  if (p.type === 'checkbox') return `<select class="input-text" data-field="cfg-default" aria-label="Default value" title="Default value">
+      <option value="0" ${p.config.default ? '' : 'selected'}>Unchecked</option>
+      <option value="1" ${p.config.default ? 'selected' : ''}>Checked</option></select>`;
   return '<span class="opt-none">\u2014</span>';
 }
 async function requestCloseCardModal(){
@@ -1870,8 +1946,9 @@ async function requestCloseCardModal(){
 function renderProps(){
   const body = $('#propsBody');
   const n = form.props.length;
+  const LABEL_HINT = { tab: 'Tab name', separator: 'Subheading' };
   body.innerHTML = form.props.map((p, i) => `
-    <tr data-k="${p._k}">
+    <tr data-k="${p._k}" class="${isLayoutType(p.type) ? 'row-layout row-' + p.type : ''}">
       <td class="ord"><span class="ord-btns">
         <span class="ord-num">${i + 1}</span>
         <button type="button" class="tbtn icon" data-prop-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Move up" title="Move up">
@@ -1883,11 +1960,12 @@ function renderProps(){
         ${Object.keys(TYPE_LABELS).map(t => `<option value="${t}" ${t === p.type ? 'selected' : ''}>${TYPE_LABELS[t]}</option>`).join('')}
       </select>${p.has_values ? '<span class="type-lock">In use by Items</span>' : ''}</td>
       <td class="opts">${renderPropOptions(p)}</td>
-      <td><input class="input-text${form.attempted && !p.label.trim() ? ' is-err' : ''}" data-field="label" type="text" maxlength="255" value="${esc(p.label)}" placeholder="e.g. Status" aria-label="Label"></td>
+      <td><input class="input-text${form.attempted && !p.label.trim() ? ' is-err' : ''}" data-field="label" type="text" maxlength="255" value="${esc(p.label)}" placeholder="${LABEL_HINT[p.type] || 'e.g. Status'}" aria-label="Label"></td>
+      ${isLayoutType(p.type) ? `<td class="center"><span class="opt-none">\u2014</span></td><td class="vis"><span class="opt-none">\u2014</span></td>` : `
       <td class="center"><input type="checkbox" data-field="is_key" ${p.is_key ? 'checked' : ''} aria-label="Key"></td>
       <td class="vis"><select class="input-text" data-field="visibility" aria-label="Visibility">
         ${Object.keys(VIS_LABELS).map(v => `<option value="${v}" ${v === p.visibility ? 'selected' : ''}>${VIS_LABELS[v]}</option>`).join('')}
-      </select></td>
+      </select></td>`}
       <td class="act"><button type="button" class="tbtn icon danger" data-prop-action="remove" aria-label="Remove property" title="Remove property">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></td>
     </tr>`).join('');
@@ -1919,14 +1997,14 @@ function validateCardForm(){
   // Hex limits are checked live (not only after a save attempt).
   let hexOk = true;
   form.props.forEach(p => {
-    const e = hexConfigErrors(p); if (!e) return;
+    const e = configErrors(p); if (!e) return;
     const tr = $(`#propsBody tr[data-k="${p._k}"]`);
     if (tr){ tr.querySelector('[data-field="cfg-min"]').classList.toggle('is-err', e.min); tr.querySelector('[data-field="cfg-max"]').classList.toggle('is-err', e.max); }
     if (e.msg) hexOk = false;
   });
   const taken = !!name && isCardNameTaken(name, form.cardId);
   $('#btnSaveCard').disabled = taken || !name;
-  const hexMsg = (form.props.map(hexConfigErrors).find(e => e && e.msg) || {}).msg || '';
+  const hexMsg = (form.props.map(configErrors).find(e => e && e.msg) || {}).msg || '';
   const err = $('#cardFormError');
   if (hexMsg) err.textContent = hexMsg;
   else if (err.dataset.hex === '1') err.textContent = '';
@@ -1939,7 +2017,7 @@ function saveCardFromForm(){
   const ok = validateCardForm();
   const err = $('#cardFormError');
   if (!ok){
-    const hexMsg = (form.props.map(hexConfigErrors).find(e => e && e.msg) || {}).msg;
+    const hexMsg = (form.props.map(configErrors).find(e => e && e.msg) || {}).msg;
     err.textContent = form.props.some(p => !sanitizeText(p.label).trim()) ? 'Every property needs a label.'
       : hexMsg || 'Please fix the highlighted fields.';
     return;
@@ -2067,18 +2145,20 @@ function wire(){
     const p = findProp(e.target); if (!p) return;
     const f = e.target.dataset.field;
     if (f === 'label'){ p.label = e.target.value; validateCardForm(); }
-    else if (f === 'cfg-min' || f === 'cfg-max'){ p.config[f === 'cfg-min' ? 'min_length' : 'max_length'] = e.target.value; validateCardForm(); }
+    else if ((f === 'cfg-min' || f === 'cfg-max') && RANGE_KEYS[p.type]){ p.config[RANGE_KEYS[p.type][f === 'cfg-min' ? 0 : 1]] = e.target.value; validateCardForm(); }
   });
   $('#propsBody').addEventListener('change', (e) => {
     const p = findProp(e.target); if (!p) return;
     const f = e.target.dataset.field;
     if (f === 'type'){
       p.type = e.target.value; p.config = formConfigFrom(p.type, null);
+      if (isLayoutType(p.type)){ p.is_key = false; p.visibility = 'show'; }
       renderProps(); validateCardForm();
       const sel = $(`#propsBody tr[data-k="${p._k}"] select[data-field="type"]`); if (sel) sel.focus();
     }
     else if (f === 'cfg-kind') p.config.kind = e.target.value;
     else if (f === 'cfg-time') p.config.include_time = e.target.checked;
+    else if (f === 'cfg-default') p.config.default = e.target.value === '1';
     else if (f === 'visibility') p.visibility = e.target.value;
     else if (f === 'is_key') p.is_key = e.target.checked;
   });
