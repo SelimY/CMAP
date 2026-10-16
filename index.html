@@ -305,6 +305,9 @@ tr.is-disabled td:not(.act){ opacity:.5; }
 @media (min-width:1024px){ .modal-box{ width:min(640px, 90%); } .modal-box.modal-wide{ width:min(760px, 90%); } }
 @media (min-width:768px) and (max-width:1023px){ .modal-box{ width:85%; } }
 .modal-box.modal-narrow{ width:min(460px, 90%); }
+/* Card modal: always as tall as the viewport (minus the overlay padding); content scrolls inside. */
+.modal-box.modal-full{ height:calc(100vh - 48px); height:calc(100dvh - 48px); max-height:none; }
+.modal-box.modal-full .modal-body{ flex:1 0 auto; }
 .modal-header{
   display:flex; align-items:center; justify-content:space-between; padding:16px 18px;
   border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); z-index:3;
@@ -344,6 +347,7 @@ textarea.field.template{ min-height:90px; font-family:var(--font-mono); font-siz
 
 /* Properties table inside the Card dialog */
 .props-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.props-foot{ display:flex; justify-content:flex-start; margin-top:8px; }
 .props-table td{ letter-spacing:normal; }
 .props-table .input-text{
   width:100%; font-family:var(--font-body); font-size:12.5px; color:var(--text);
@@ -446,7 +450,7 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC6</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC7</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -585,11 +589,11 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 
 </main>
 
-<footer>CMAP v1.0.RC6</footer>
+<footer>CMAP v1.0.RC7</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
-  <div class="modal-box modal-wide" role="dialog" aria-modal="true" aria-labelledby="cardModalTitle">
+  <div class="modal-box modal-wide modal-full" role="dialog" aria-modal="true" aria-labelledby="cardModalTitle">
     <div class="modal-header">
       <h2 id="cardModalTitle">New Card</h2>
       <button type="button" class="modal-close" data-close="card" aria-label="Close">&#x2715;</button>
@@ -615,7 +619,6 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
       <div class="field-wrap">
         <div class="props-head">
           <span class="field-label" style="margin:0">Properties</span>
-          <button type="button" class="import-btn secondary btn-sm" data-action="add-prop">New Property</button>
         </div>
         <div class="table-scroll props-box">
           <table class="data-table props-table">
@@ -633,6 +636,9 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
             <tbody id="propsBody"></tbody>
           </table>
           <div class="empty-state" id="propsEmpty">No properties yet — use “New Property” to add one.</div>
+        </div>
+        <div class="props-foot">
+          <button type="button" class="import-btn secondary btn-sm" data-action="add-prop">New Property</button>
         </div>
       </div>
 
@@ -672,7 +678,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC6
+   CMAP v1.0.RC7
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -682,7 +688,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC6';
+const APP_VERSION     = '1.0.RC7';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
