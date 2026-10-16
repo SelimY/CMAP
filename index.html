@@ -516,6 +516,27 @@ body.items-mode .wrap{ flex:1 1 auto; min-height:0; padding-bottom:10px; }
   .items-layout{ grid-template-columns:1fr; grid-template-rows:minmax(160px, 2fr) 3fr; }
 }
 
+/* Item form: label left (~32%), input right; full-width separators and tab bar */
+#itemFormBody .item-field{ display:grid; grid-template-columns:minmax(0, 32%) minmax(0, 1fr); column-gap:16px; align-items:start; }
+#itemFormBody .item-label{ margin:0; padding-top:11px; line-height:1.35; overflow-wrap:anywhere; white-space:normal; }
+#itemFormBody .item-input{ min-width:0; display:flex; flex-direction:column; }
+#itemFormBody .item-field .check-field{ padding-top:9px; }
+#itemFormBody .item-pane{ gap:6px; }
+.field-foot{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.field-foot .field-msg{ flex:1; min-width:0; }
+.char-count{ font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-top:4px; white-space:nowrap; }
+.char-count.at-limit{ color:var(--accent); font-weight:600; }
+textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-height:1.45; }
+.date-field{ display:flex; align-items:center; gap:6px; position:relative; }
+.date-field .field{ flex:1; min-width:0; }
+.date-btn{ width:34px; height:34px; flex:none; }
+.date-native{ position:absolute; right:0; bottom:0; width:34px; height:34px; opacity:0; pointer-events:none; border:0; padding:0; }
+@media (max-width:500px){
+  #itemFormBody .item-field{ grid-template-columns:1fr; }
+  #itemFormBody .item-label{ padding-top:0; margin-bottom:6px; }
+  #itemFormBody .item-field .check-field{ padding-top:0; }
+}
+
 </style>
 </head>
 <body>
@@ -529,7 +550,7 @@ body.items-mode .wrap{ flex:1 1 auto; min-height:0; padding-bottom:10px; }
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC7</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC8</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -705,7 +726,7 @@ body.items-mode .wrap{ flex:1 1 auto; min-height:0; padding-bottom:10px; }
 
 </main>
 
-<footer>CMAP v1.0.RC7</footer>
+<footer>CMAP v1.0.RC8</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -838,7 +859,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC7
+   CMAP v1.0.RC8
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -848,7 +869,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC7';
+const APP_VERSION     = '1.0.RC8';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
@@ -867,12 +888,13 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
         date     → {"include_time":true|false}
         percent  → {"min":<int 0–100>,"max":<int 0–100>}
         checkbox → {"default":true|false}
-        icon / text / enum / tab / separator → NULL
+        text     → {"max_length":<int 1–4000>}   (NULL / missing = 255, applied when read)
+        icon / enum / tab / separator → NULL
     - tab / separator carry no value: is_key is always 0 and visibility always 'show'.
     - nodes form the Item-Tree: parent_id NULL = root (Project); card_id NULL = "Folder", else a Card node.
       sort_order orders siblings (roots: the parent_id IS NULL group). items.sort_order orders a node's Items.
     - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f;
-      checkbox stored as '0' / '1').
+      checkbox stored as '0' / '1'; date as YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss).
   Future (Supabase phase, not created here):
     -- card_access (card_id, grantee_user_id, permission 'read'|'write') for CoWork sharing.
 */
@@ -1194,13 +1216,21 @@ function cleanPropertyInput(p){
 }
 
 /* ---------- Type-specific property settings (properties.config) ---------- */
+const TEXT_MAX_DEFAULT = 255, TEXT_MAX_LIMIT = 4000, TEXT_SINGLE_LINE_MAX = 100;
 function defaultPropertyConfig(type){
+  if (type === 'text') return { max_length: TEXT_MAX_DEFAULT };
   if (type === 'number') return { kind: 'integer' };
   if (type === 'hex') return { min_length: null, max_length: null };
   if (type === 'date') return { include_time: false };
   if (type === 'percent') return { min: 0, max: 100 };
   if (type === 'checkbox') return { default: false };
   return null;
+}
+/** Parses a Text max length: a whole number from 1 to 4000 (required). */
+function parseTextMax(v){
+  const s = v == null ? '' : String(v).trim();
+  if (!/^\d+$/.test(s) || Number(s) < 1 || Number(s) > TEXT_MAX_LIMIT) return { error: 'must be a whole number from 1 to 4000' };
+  return { value: Number(s) };
 }
 /** Parses a percent bound: a whole number from 0 to 100 (required). */
 function parsePercentBound(v){
@@ -1232,6 +1262,11 @@ function validatePropertyConfig(type, config, label = 'this property'){
     return { min_length: mn.value, max_length: mx.value };
   }
   if (type === 'date') return { include_time: c.include_time === true };
+  if (type === 'text'){
+    const mx = parseTextMax(c.max_length == null ? TEXT_MAX_DEFAULT : c.max_length);
+    if (mx.error) throw new CmapError('invalid', `Max length of "${label}" ${mx.error}.`);
+    return { max_length: mx.value };
+  }
   if (type === 'percent'){
     const mn = parsePercentBound(c.min == null ? 0 : c.min), mx = parsePercentBound(c.max == null ? 100 : c.max);
     if (mn.error) throw new CmapError('invalid', `Min of "${label}" ${mn.error}.`);
@@ -1257,14 +1292,16 @@ function parsePropertyConfig(type, text){
    The Item form (Items tab) must validate every value with these rules before saving, in the UI
    (live, field-level English messages) AND again in the adapter right before the write. */
 const ITEM_VALUE_RULES = Object.freeze({
-  text:   { trim: true, sanitize: 'sanitizeText(value)' },
+  text:   { trim: true, sanitize: 'sanitizeText(value); line breaks + tabs kept when config.max_length > 100',
+            maxLengthFrom: 'config.max_length (default 255, line breaks count)', singleLineUpTo: 100 },
   number: { integer: /^[+-]?\d+$/, decimal: /^[+-]?(\d+(\.\d+)?|\.\d+)$/, decimalSeparator: '.', kindFrom: 'config.kind',
             reject: 'anything non-numeric' },
   hex:    { prefix: '0x', prefixRequired: true, prefixLocked: 'input is pre-filled with 0x; the prefix cannot be removed or edited',
             digits: /^[0-9a-fA-F]+$/, minDigits: 1, lengthFrom: 'config.min_length / config.max_length (digits only, prefix excluded)',
             storeAs: '"0x" + digits, all lowercase (e.g. 0x1a2f)' },
-  date:   { dateOnly: 'YYYY-MM-DD', withTime: 'YYYY-MM-DDTHH:mm (ISO 8601) when config.include_time is true',
-            mustBe: 'a real calendar date; time required when include_time' },
+  date:   { input: 'DD-MM-YYYY, or DD-MM-YYYY hh:mm:ss (24 h) when config.include_time is true',
+            storeAs: 'ISO 8601: YYYY-MM-DD / YYYY-MM-DDTHH:mm:ss (a stored THH:mm is read as :00 seconds)',
+            mustBe: 'a real calendar date; hours 00–23, minutes and seconds 00–59' },
   enum:   { required: true, maxLength: 255, trim: true, dedupe: 'case-insensitive, per property (upsertEnumValue)' },
   icon:   { mustBe: 'a key of the embedded ICON_SET (iconExists)' },
   tab:       { carriesValue: false, validation: 'none; the label is only displayed (as text, never HTML)' },
@@ -1413,7 +1450,15 @@ function validateItemValue(prop, raw){
   const cfg = prop.config || defaultPropertyConfig(prop.type) || {};
   switch (prop.type){
     case 'tab': case 'separator': return { value: null };
-    case 'text': { const v = sanitizeText(raw).trim(); return { value: v || null }; }
+    case 'text': {
+      const max = (cfg.max_length > 0 ? cfg.max_length : TEXT_MAX_DEFAULT), multi = max > TEXT_SINGLE_LINE_MAX;
+      const kept = sanitizeText(raw, { multiline: true }).trim();
+      if (!kept) return { value: null };
+      if (!multi && /\n/.test(kept)) return { error: 'Line breaks aren\u2019t allowed in this field.' };
+      const v = multi ? kept : sanitizeText(kept).trim();
+      if (v.length > max) return { error: `At most ${max} characters (currently ${v.length}).` };
+      return { value: v };
+    }
     case 'number': {
       const v = sanitizeText(raw).trim(); if (!v) return { value: null };
       if (cfg.kind === 'decimal') return ITEM_VALUE_RULES.number.decimal.test(v) || ITEM_VALUE_RULES.number.integer.test(v)
@@ -1432,11 +1477,7 @@ function validateItemValue(prop, raw){
     }
     case 'date': {
       const v = sanitizeText(raw).trim(); if (!v) return { value: null };
-      const m = cfg.include_time ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v) : /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
-      if (!m) return { error: cfg.include_time ? 'Enter a date and a time.' : 'Enter a valid date.' };
-      if (!isRealDate(+m[1], +m[2], +m[3])) return { error: 'Enter a valid date.' };
-      if (cfg.include_time && (+m[4] > 23 || +m[5] > 59)) return { error: 'Enter a valid time.' };
-      return { value: v };
+      return parseDateValue(v, !!cfg.include_time);
     }
     case 'percent': {
       const v = sanitizeText(raw).trim(); if (!v) return { value: null };
@@ -1461,6 +1502,34 @@ function validateItemValue(prop, raw){
     }
   }
   return { error: 'Unknown property type.' };
+}
+/* ---------- Dates: input DD-MM-YYYY[ hh:mm:ss], stored ISO 8601 ---------- */
+const DATE_FMT = { date: 'DD-MM-YYYY', dateTime: 'DD-MM-YYYY hh:mm:ss' };
+/** Accepts the input format (DD-MM-YYYY[ hh:mm:ss]) or stored ISO; returns { value: ISO } or { error }. */
+function parseDateValue(v, withTime){
+  let m = /^(\d{2})-(\d{2})-(\d{4})(?: (\d{2}):(\d{2}):(\d{2}))?$/.exec(v), d, mo, y, h, mi, s;
+  if (m){ [d, mo, y, h, mi, s] = [m[1], m[2], m[3], m[4], m[5], m[6]]; }
+  else if ((m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(v))){ [y, mo, d, h, mi, s] = [m[1], m[2], m[3], m[4], m[5], m[6] || (m[4] ? '00' : undefined)]; }
+  else return { error: `Use the format ${withTime ? DATE_FMT.dateTime : DATE_FMT.date}.` };
+  if (!isRealDate(+y, +mo, +d)) return { error: 'Enter a real calendar date.' };
+  if (withTime && h === undefined) return { error: 'Enter a time as well (hh:mm:ss).' };
+  if (!withTime && h !== undefined) return { error: `Use the format ${DATE_FMT.date} (no time).` };
+  if (withTime && (+h > 23 || +mi > 59 || +s > 59)) return { error: 'Enter a valid time (00:00:00\u201323:59:59).' };
+  return { value: withTime ? `${y}-${mo}-${d}T${h}:${mi}:${s}` : `${y}-${mo}-${d}` };
+}
+/** Stored ISO → input format. A date-only property drops any stored time. */
+function isoToDateInput(iso, withTime){
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(String(iso || ''));
+  if (!m) return String(iso || '');
+  const date = `${m[3]}-${m[2]}-${m[1]}`;
+  return withTime && m[4] ? `${date} ${m[4]}:${m[5]}:${m[6] || '00'}` : date;
+}
+/** Stored ISO → table display: YYYY-MM-DD or YYYY-MM-DD hh:mm:ss. */
+function isoToDateDisplay(iso, withTime){
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(String(iso || ''));
+  if (!m) return String(iso || '');
+  const date = `${m[1]}-${m[2]}-${m[3]}`;
+  return withTime && m[4] ? `${date} ${m[4]}:${m[5]}:${m[6] || '00'}` : date;
 }
 /** Splits properties (in sort_order) into form tabs: everything before the first 'tab' goes to "Main". */
 function groupPropertiesIntoTabs(props){
@@ -2357,12 +2426,19 @@ function formConfigFrom(type, cfg){
   const c = cfg || defaultPropertyConfig(type);
   if (type === 'hex') return { min_length: c.min_length == null ? '' : String(c.min_length), max_length: c.max_length == null ? '' : String(c.max_length) };
   if (type === 'percent') return { min: String(c.min), max: String(c.max) };
+  if (type === 'text') return { max_length: String(c.max_length) };
   return c ? { ...c } : null;
 }
 /** Which config keys the shared Min / Max inputs edit, per type. */
 const RANGE_KEYS = { hex: ['min_length', 'max_length'], percent: ['min', 'max'] };
 /** Returns { min, max, msg } error flags for the Min / Max inputs of a hex or percent property. */
 function configErrors(p){
+  if (!p.config) p.config = formConfigFrom(p.type, null);
+  if (!p.config) return null;
+  if (p.type === 'text'){
+    const mx = parseTextMax(p.config.max_length);
+    return { max: !!mx.error, fields: { 'cfg-maxlen': !!mx.error }, msg: mx.error ? 'Text max length must be a whole number from 1 to 4000.' : '' };
+  }
   if (p.type === 'percent'){
     const mn = parsePercentBound(p.config.min), mx = parsePercentBound(p.config.max);
     const order = !mn.error && !mx.error && mn.value > mx.value;
@@ -2397,6 +2473,9 @@ function renderPropOptions(p){
   if (p.type === 'checkbox') return `<select class="input-text" data-field="cfg-default" aria-label="Default value" title="Default value">
       <option value="0" ${p.config.default ? '' : 'selected'}>Unchecked</option>
       <option value="1" ${p.config.default ? 'selected' : ''}>Checked</option></select>`;
+  if (p.type === 'text') return `<span class="opt-hex" title="Maximum number of characters, 1–4000. Up to 100 the Item form uses a single-line box; above that a multi-line box.">
+      <input class="input-text opt-num" data-field="cfg-maxlen" type="text" inputmode="numeric" maxlength="4" placeholder="255" aria-label="Max length" value="${esc(p.config.max_length)}">
+      <span class="opt-unit">max chars</span></span>`;
   return '<span class="opt-none">\u2014</span>';
 }
 async function requestCloseCardModal(){
@@ -2466,7 +2545,8 @@ function validateCardForm(){
   form.props.forEach(p => {
     const e = configErrors(p); if (!e) return;
     const tr = $(`#propsBody tr[data-k="${p._k}"]`);
-    if (tr){ tr.querySelector('[data-field="cfg-min"]').classList.toggle('is-err', e.min); tr.querySelector('[data-field="cfg-max"]').classList.toggle('is-err', e.max); }
+    const flags = e.fields || { 'cfg-min': e.min, 'cfg-max': e.max };
+    if (tr) Object.keys(flags).forEach(f => { const el = tr.querySelector(`[data-field="${f}"]`); if (el) el.classList.toggle('is-err', !!flags[f]); });
     if (e.msg) hexOk = false;
   });
   const taken = !!name && isCardNameTaken(name, form.cardId);
@@ -2530,7 +2610,7 @@ function wire(){
         }
         case 'new-card': return openCardModal(null);
         case 'add-prop': {
-          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, visibility: 'show', has_values: false, config: null });
+          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, visibility: 'show', has_values: false, config: formConfigFrom('text', null) });
           renderProps(); validateCardForm();
           const inputs = $$('#propsBody input[data-field="label"]'); inputs[inputs.length - 1].focus();
           return;
@@ -2619,6 +2699,7 @@ function wire(){
     const p = findProp(e.target); if (!p) return;
     const f = e.target.dataset.field;
     if (f === 'label'){ p.label = e.target.value; validateCardForm(); }
+    else if (f === 'cfg-maxlen' && p.type === 'text'){ p.config.max_length = e.target.value; validateCardForm(); }
     else if ((f === 'cfg-min' || f === 'cfg-max') && RANGE_KEYS[p.type]){ p.config[RANGE_KEYS[p.type][f === 'cfg-min' ? 0 : 1]] = e.target.value; validateCardForm(); }
   });
   $('#propsBody').addEventListener('change', (e) => {
@@ -2745,6 +2826,8 @@ function itemsEmpty(html){
 }
 function formatCell(p, v){
   if (v == null || v === '') return '<span class="cell-empty">\u2014</span>';
+  if (p.type === 'text') return `<span title="${esc(v)}">${esc(String(v).replace(/\s*\n\s*/g, ' '))}</span>`;
+  if (p.type === 'date') return esc(isoToDateDisplay(v, p.config && p.config.include_time));
   if (p.type === 'icon') return iconExists(v) ? `<span class="cell-icon" title="${esc(v)}">${renderIcon(v, 16)}</span>` : esc(v);
   if (p.type === 'checkbox') return `<span class="cell-icon cell-check">${v === '1' ? TICO.boxOn : TICO.boxOff}</span>`;
   if (p.type === 'percent') return esc(v) + '%';
@@ -2752,6 +2835,8 @@ function formatCell(p, v){
 }
 function cellText(p, v){
   if (v == null) return '';
+  if (p.type === 'date') return isoToDateDisplay(v, p.config && p.config.include_time);
+  if (p.type === 'text') return String(v).replace(/\s*\n\s*/g, ' ');
   if (p.type === 'checkbox') return v === '1' ? 'checked true yes' : 'unchecked false no';
   if (p.type === 'percent') return v + '%';
   return String(v);
@@ -2869,19 +2954,31 @@ function clearDropMarks(){ $$('#tree .tree-row').forEach(r => r.classList.remove
 const itemForm = { nodeId: null, itemId: null, props: [], values: {}, errors: {}, tab: null, snapshot: '' };
 const cssId = (v) => (window.CSS && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^\w-]/g, '\\$&');
 function itemField(pid){ return $(`#itemFormBody [data-pid="${cssId(pid)}"]`); }
-function renderItemControl(p, v){
+function renderItemControl(p, v, fid = ''){
   const pid = esc(p.id), lab = esc(p.label);
   switch (p.type){
-    case 'number': return `<input class="field input-text" data-ctl="text" type="text" inputmode="${p.config.kind === 'decimal' ? 'decimal' : 'numeric'}" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.kind === 'decimal' ? 'e.g. 12.5' : 'e.g. 12'}">`;
-    case 'percent': return `<div class="affix"><input class="field input-text" data-ctl="text" type="text" inputmode="numeric" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.min}\u2013${p.config.max}"><span class="affix-unit">%</span></div>`;
-    case 'hex': return `<input class="field input-text mono" data-ctl="hex" type="text" spellcheck="false" autocomplete="off" aria-label="${lab}" value="${esc(v || '0x')}">`;
-    case 'date': return `<input class="field input-text" data-ctl="text" type="${p.config.include_time ? 'datetime-local' : 'date'}" aria-label="${lab}" value="${esc(v)}">`;
-    case 'checkbox': return `<label class="check-field"><input type="checkbox" data-ctl="check" aria-label="${lab}" ${v === '1' || v === true ? 'checked' : ''}> ${lab}</label>`;
-    case 'enum': return `<div class="pick-field"><button type="button" class="pick-btn" data-ctl="enum" aria-label="${lab}">${v ? esc(v) : '<span class="placeholder">Choose or type a value\u2026</span>'}</button>
+    case 'number': return `<input class="field input-text" id="${fid}" data-ctl="text" type="text" inputmode="${p.config.kind === 'decimal' ? 'decimal' : 'numeric'}" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.kind === 'decimal' ? 'e.g. 12.5' : 'e.g. 12'}">`;
+    case 'percent': return `<div class="affix"><input class="field input-text" id="${fid}" data-ctl="text" type="text" inputmode="numeric" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.min}\u2013${p.config.max}"><span class="affix-unit">%</span></div>`;
+    case 'hex': return `<input class="field input-text mono" id="${fid}" data-ctl="hex" type="text" spellcheck="false" autocomplete="off" aria-label="${lab}" value="${esc(v || '0x')}">`;
+    case 'date': {
+      const t = !!p.config.include_time;
+      return `<div class="date-field"><input class="field input-text mono" id="${fid}" data-ctl="date" data-time="${t ? 1 : 0}" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
+          maxlength="${t ? 19 : 10}" placeholder="${t ? DATE_FMT.dateTime : DATE_FMT.date}" aria-label="${lab}" value="${esc(v)}">
+        <button type="button" class="tbtn date-btn" data-date-pick="1" title="Open calendar" aria-label="Open calendar"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button>
+        <input class="date-native" type="${t ? 'datetime-local' : 'date'}" ${t ? 'step="1"' : ''} tabindex="-1" aria-hidden="true"></div>`;
+    }
+    case 'checkbox': return `<span class="check-field"><input type="checkbox" id="${fid}" data-ctl="check" aria-label="${lab}" ${v === '1' || v === true ? 'checked' : ''}></span>`;
+    case 'enum': return `<div class="pick-field"><button type="button" class="pick-btn" id="${fid}" data-ctl="enum" aria-label="${lab}">${v ? esc(v) : '<span class="placeholder">Choose or type a value\u2026</span>'}</button>
         <button type="button" class="tbtn pick-clear" data-ctl-clear="1" title="Clear" aria-label="Clear">${ICO.purge}</button></div>`;
-    case 'icon': return `<div class="pick-field"><button type="button" class="pick-btn" data-ctl="icon" aria-label="${lab}">${v && iconExists(v) ? renderIcon(v, 18) + ' ' + esc(v) : '<span class="placeholder">Choose an icon\u2026</span>'}</button>
+    case 'icon': return `<div class="pick-field"><button type="button" class="pick-btn" id="${fid}" data-ctl="icon" aria-label="${lab}">${v && iconExists(v) ? renderIcon(v, 18) + ' ' + esc(v) : '<span class="placeholder">Choose an icon\u2026</span>'}</button>
         <button type="button" class="tbtn pick-clear" data-ctl-clear="1" title="Clear" aria-label="Clear">${ICO.purge}</button></div>`;
-    default: return `<input class="field input-text" data-ctl="text" type="text" aria-label="${lab}" value="${esc(v)}">`;
+    case 'text': {
+      const max = p.config.max_length || TEXT_MAX_DEFAULT;
+      return (max > TEXT_SINGLE_LINE_MAX || /\n/.test(String(v || '')))
+        ? `<textarea class="field input-text item-area" id="${fid}" data-ctl="text" data-max="${max}" data-multi="${max > TEXT_SINGLE_LINE_MAX ? 1 : 0}" rows="3" maxlength="${max}" aria-label="${lab}">${esc(v)}</textarea>`
+        : `<input class="field input-text" id="${fid}" data-ctl="text" data-max="${max}" data-multi="0" type="text" maxlength="${max}" aria-label="${lab}" value="${esc(v)}">`;
+    }
+    default: return `<input class="field input-text" id="${fid}" data-ctl="text" type="text" aria-label="${lab}" value="${esc(v)}">`;
   }
 }
 function openItemModal(nodeId, itemId = null){
@@ -2895,7 +2992,9 @@ function openItemModal(nodeId, itemId = null){
     if (isLayoutType(p.type)) return;
     const stored = item ? item.values[p.id] : undefined;
     itemForm.values[p.id] = p.type === 'checkbox' ? (stored != null ? stored === '1' : !!(p.config && p.config.default))
-      : p.type === 'hex' ? (stored || '0x') : (stored ?? '');
+      : p.type === 'hex' ? (stored || '0x')
+      : p.type === 'date' ? (stored ? isoToDateInput(stored, !!(p.config && p.config.include_time)) : '')
+      : (stored ?? '');
   });
   let tabs = groupPropertiesIntoTabs(props);
   if (tabs.length > 1 && !tabs[0].props.length) tabs = tabs.slice(1); // no fields before the first Tab → no empty "Main"
@@ -2904,15 +3003,20 @@ function openItemModal(nodeId, itemId = null){
   const bar = $('#itemTabs');
   bar.hidden = tabs.length < 2;
   bar.innerHTML = tabs.map(t => `<button type="button" class="item-tab" role="tab" data-item-tab="${esc(t.key)}" aria-selected="${t.key === itemForm.tab}">${esc(t.name)}</button>`).join('');
+  let seq = 0;
   $('#itemFormBody').innerHTML = tabs.map(t => `<div class="item-pane" data-pane="${esc(t.key)}" ${t.key === itemForm.tab ? '' : 'hidden'}>
-      ${t.props.map(p => p.type === 'separator'
-        ? `<div class="item-sep"><h3>${esc(p.label)}</h3><hr></div>`
-        : `<div class="field-wrap" data-pid="${esc(p.id)}">
-            ${p.type === 'checkbox' ? '' : `<span class="field-label">${esc(p.label)}</span>`}
-            ${renderItemControl(p, itemForm.values[p.id])}
-            <div class="field-msg"></div></div>`).join('') || '<div class="empty-state">No fields on this tab.</div>'}
+      ${t.props.map(p => { if (p.type === 'separator') return `<div class="item-sep"><h3>${esc(p.label)}</h3><hr></div>`;
+        const fid = 'if-' + (++seq);
+        return `<div class="field-wrap item-field" data-pid="${esc(p.id)}">
+            <label class="field-label item-label" for="${fid}">${esc(p.label)}</label>
+            <div class="item-input">${renderItemControl(p, itemForm.values[p.id], fid)}
+              <div class="field-foot"><div class="field-msg"></div>${p.type === 'text' ? '<span class="char-count" aria-live="polite"></span>' : ''}</div></div></div>`; }).join('')
+        || '<div class="empty-state">No fields on this tab.</div>'}
     </div>`).join('') + (props.filter(p => !isLayoutType(p.type)).length ? '' : '<div class="empty-state">This Card has no properties yet.</div>');
   $('#itemFormError').textContent = '';
+  $$('#itemFormBody .item-field').forEach(updateCharCount);
+  // A value longer than a (since lowered) limit is flagged right away: it can't be saved until shortened.
+  props.forEach(p => { if (p.type === 'text' && String(itemForm.values[p.id] || '').length > (p.config.max_length || TEXT_MAX_DEFAULT)) validateItemField(p.id); });
   itemForm.snapshot = JSON.stringify(itemForm.values);
   openModal('itemModal', () => requestCloseItemModal());
   setTimeout(() => { const first = $('#itemFormBody .item-pane:not([hidden]) [data-ctl]'); if (first) first.focus(); }, 0);
@@ -2931,9 +3035,29 @@ function validateItemField(pid, show = true){
   if (wrap && show){
     const m = wrap.querySelector('.field-msg'); m.className = 'field-msg' + (r.error ? ' err' : ''); m.textContent = r.error || '';
     const ctl = wrap.querySelector('[data-ctl]'); if (ctl) ctl.classList.toggle('is-err', !!r.error);
+    updateCharCount(wrap);
   }
   markTabErrors();
   return !r.error;
+}
+/** "n/max" counter under Text fields; red once the limit is reached (line breaks count). */
+function updateCharCount(wrap){
+  const c = wrap.querySelector('.char-count'), el = wrap.querySelector('[data-ctl="text"][data-max]');
+  if (!c || !el) return;
+  const n = el.value.length, max = +el.dataset.max;
+  c.textContent = `${n}/${max}`;
+  c.classList.toggle('at-limit', n >= max);
+}
+/* Date box mask: digits only, separators inserted automatically → DD-MM-YYYY[ hh:mm:ss]. */
+const DATE_SEPS = { 2: '-', 4: '-', 8: ' ', 10: ':', 12: ':' };
+function maskDateInput(el){
+  const withTime = el.dataset.time === '1', v = el.value, caret = el.selectionStart ?? v.length;
+  const digitsBefore = v.slice(0, caret).replace(/\D/g, '').length;
+  const d = v.replace(/\D/g, '').slice(0, withTime ? 14 : 8);
+  let out = '', pos = 0;
+  for (let i = 0; i < d.length; i++){ if (i > 0 && DATE_SEPS[i] && (withTime || i < 8)) out += DATE_SEPS[i]; out += d[i]; if (i + 1 === digitsBefore) pos = out.length; }
+  if (digitsBefore === 0) pos = 0;
+  if (out !== v){ el.value = out; try { el.setSelectionRange(pos, pos); } catch (_) {} }
 }
 function markTabErrors(){
   (itemForm.tabs || []).forEach(t => {
@@ -3104,9 +3228,27 @@ function wireItems(){
   $('#itemTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-item-tab]'); if (b) setItemTab(b.dataset.itemTab); });
   const form = $('#itemFormBody');
   form.addEventListener('focusin', (e) => { if (e.target.dataset && e.target.dataset.ctl === 'hex' && !e.target._guard){ e.target._guard = true; guardHexInput(e.target); } });
+  form.addEventListener('keydown', (e) => {
+    const el = e.target;
+    if (el.dataset && el.dataset.ctl === 'date' && e.key === 'Backspace' && el.selectionStart === el.selectionEnd && /[-: ]/.test(el.value[el.selectionStart - 1] || '')){
+      el.setSelectionRange(el.selectionStart - 1, el.selectionStart - 1); // jump over a separator so Backspace removes the digit before it
+    }
+  });
+  // Pasted text: sanitized (single-line boxes turn line breaks into spaces) and cut at the limit.
+  form.addEventListener('paste', (e) => {
+    const el = e.target;
+    if (!el.dataset || el.dataset.ctl !== 'text' || !el.dataset.max) return;
+    e.preventDefault();
+    const max = +el.dataset.max, s = el.selectionStart, en = el.selectionEnd;
+    let t = sanitizeText((e.clipboardData || window.clipboardData).getData('text/plain') || '', { multiline: el.dataset.multi === '1' });
+    t = t.slice(0, Math.max(0, max - (el.value.length - (en - s))));
+    el.setRangeText(t, s, en, 'end');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   form.addEventListener('input', (e) => {
     const w = e.target.closest('[data-pid]'); if (!w) return;
     const ctl = e.target.dataset.ctl;
+    if (ctl === 'date'){ maskDateInput(e.target); itemForm.values[w.dataset.pid] = e.target.value; validateItemField(w.dataset.pid); return; }
     if (ctl === 'text' || ctl === 'hex'){
       itemForm.values[w.dataset.pid] = e.target.value; validateItemField(w.dataset.pid);
     }
@@ -3127,6 +3269,18 @@ function wireItems(){
         : (v ? esc(v) : '<span class="placeholder">Choose or type a value\u2026</span>');
       validateItemField(pid);
     };
+    if (e.target.closest('[data-date-pick]')){
+      const box = w.querySelector('[data-ctl="date"]'), nat = w.querySelector('.date-native');
+      const iso = parseDateValue(box.value, box.dataset.time === '1');
+      nat.value = iso.value || '';
+      nat.onchange = nat.oninput = () => {
+        if (!nat.value) return;
+        box.value = isoToDateInput(nat.value.length === 16 ? nat.value + ':00' : nat.value, box.dataset.time === '1');
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      try { if (nat.showPicker) nat.showPicker(); else nat.focus(); } catch (_) { nat.focus(); }
+      return;
+    }
     if (e.target.closest('[data-ctl-clear]')){ itemForm.values[pid] = ''; repaint(); return; }
     const ctl = e.target.closest('[data-ctl]'); if (!ctl) return;
     if (ctl.dataset.ctl === 'enum'){
