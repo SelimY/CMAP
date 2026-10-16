@@ -437,6 +437,85 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
 }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
 
+/* ==================== ITEMS TAB (Item-Tree + Items) ==================== */
+/* While the Items tab is open the page itself doesn't scroll; the two panels scroll inside. */
+body.items-mode{ height:100vh; height:100dvh; min-height:0; overflow:hidden; }
+body.items-mode .wrap{ flex:1 1 auto; min-height:0; padding-bottom:10px; }
+.items-view{ flex:1 1 auto; min-height:0; }
+.items-layout{ flex:1 1 auto; min-height:0; display:grid; grid-template-columns:minmax(240px, 3fr) 7fr; gap:14px; height:100%; }
+.tree-panel, .items-panel{ display:flex; flex-direction:column; min-height:0; min-width:0; overflow:hidden; }
+.tree-panel .panel-label-row, .items-panel .panel-label-row{ flex:none; }
+.project-row{ display:flex; align-items:center; gap:8px; margin-bottom:10px; flex:none; }
+.project-row .field-label{ margin:0; white-space:nowrap; }
+.project-row select{ flex:1; min-width:0; padding:6px 8px; }
+.tree-scroll, .items-scroll{ flex:1 1 auto; min-height:0; overflow:auto; border:1px solid var(--border); border-radius:var(--radius-md); }
+.items-panel .toolbar{ flex:none; }
+.tree{ padding:4px 0; min-width:max-content; }
+.tree-row{
+  display:flex; align-items:center; gap:6px; padding:4px 8px 4px 0; cursor:pointer; position:relative;
+  border-top:2px solid transparent; border-bottom:2px solid transparent; user-select:none;
+}
+.tree-row:hover{ background:var(--surface-2); }
+.tree-row.selected{ background:color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.tree-row.selected .tree-name{ color:var(--accent); font-weight:600; }
+.tree-row.dragging{ opacity:.45; }
+.tree-row.drop-before{ border-top-color:var(--accent); }
+.tree-row.drop-after{ border-bottom-color:var(--accent); }
+.tree-row.drop-inside{ outline:2px dashed var(--accent); outline-offset:-2px; }
+.tree-toggle{ width:18px; height:18px; flex:none; display:inline-flex; align-items:center; justify-content:center; border:none; background:none; color:var(--muted); cursor:pointer; padding:0; border-radius:4px; }
+.tree-toggle:hover{ color:var(--text); }
+.tree-toggle svg{ transition:transform .12s ease; }
+.tree-toggle[aria-expanded="true"] svg{ transform:rotate(90deg); }
+.tree-toggle.leaf{ visibility:hidden; }
+.tree-ico{ flex:none; display:inline-flex; color:var(--gold); }
+.tree-ico.card{ color:var(--teal); }
+.tree-name{ font-size:13.5px; white-space:nowrap; }
+.tree-card{ font-family:var(--font-mono); font-size:11px; color:var(--muted); white-space:nowrap; }
+.tree-card.disabled{ text-decoration:line-through; }
+.tree-acts{ margin-left:auto; display:inline-flex; gap:3px; padding-left:10px; flex:none; }
+.tree-acts .tbtn{ width:24px; height:24px; }
+.items-table th.handle, .items-table td.handle{ width:1%; padding-left:6px; padding-right:2px; }
+.items-table td.cell-val{ white-space:nowrap; max-width:320px; overflow:hidden; text-overflow:ellipsis; }
+.items-table td.num{ text-align:right; font-family:var(--font-mono); }
+.items-table thead th{ position:sticky; top:0; z-index:1; }
+.drag-handle{ cursor:grab; color:var(--muted); display:inline-flex; padding:2px; border-radius:4px; }
+.drag-handle:hover{ color:var(--text); }
+.items-table tr.dragging{ opacity:.45; }
+.items-table tr.drop-before td{ box-shadow:inset 0 2px 0 var(--accent); }
+.items-table tr.drop-after td{ box-shadow:inset 0 -2px 0 var(--accent); }
+.cell-check{ font-family:var(--font-mono); }
+.cell-icon{ display:inline-flex; color:var(--text); vertical-align:middle; }
+.cell-empty{ color:var(--muted); }
+
+/* Item form */
+.item-tabs{ display:flex; gap:4px; padding:0 18px; border-bottom:1px solid var(--border); flex:none; overflow-x:auto; position:sticky; top:57px; background:var(--surface); z-index:2; }
+.item-tab{ font-family:var(--font-display); font-weight:600; font-size:14px; padding:9px 14px; border:none; background:none; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; }
+.item-tab[aria-selected="true"]{ color:var(--text); border-bottom-color:var(--accent); }
+.item-tab.has-error{ color:var(--accent); }
+.item-tab.has-error::after{ content:" \2022"; }
+.item-pane{ display:flex; flex-direction:column; gap:12px; }
+.item-sep{ margin:6px 0 0; }
+.item-sep h3{ font-family:var(--font-display); font-size:14.5px; font-weight:600; margin:0 0 6px; }
+.item-sep hr{ border:none; border-top:1px solid var(--border); margin:0; }
+.affix{ display:flex; align-items:center; gap:8px; }
+.affix .field{ flex:1; min-width:0; }
+.affix-unit{ font-family:var(--font-mono); font-size:13px; color:var(--muted); }
+.check-field{ display:inline-flex; align-items:center; gap:8px; font-size:13.5px; cursor:pointer; }
+.check-field input{ width:16px; height:16px; accent-color:var(--accent); }
+.pick-field{ display:flex; align-items:center; gap:8px; }
+.pick-btn{
+  flex:1; min-width:0; display:flex; align-items:center; gap:8px; text-align:left; cursor:pointer;
+  font-family:var(--font-body); font-size:13.5px; color:var(--text);
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-md); padding:9px 12px;
+}
+.pick-btn:focus{ border-color:var(--accent); outline:none; }
+.pick-btn.is-err{ border-color:var(--accent); }
+.pick-btn .placeholder{ color:var(--muted); }
+.pick-clear{ flex:none; }
+@media (max-width:720px){
+  .items-layout{ grid-template-columns:1fr; grid-template-rows:minmax(160px, 2fr) 3fr; }
+}
+
 </style>
 </head>
 <body>
@@ -544,11 +623,48 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
   </section>
 
   <!-- ---------- Items (coming soon) ---------- -->
-  <section class="tab-panel" id="viewItems" hidden>
-    <section class="panel">
-      <div class="panel-label-row"><div class="panel-label">Items</div></div>
-      <div class="empty-state">Coming soon — you’ll create and browse Items from your Cards here.</div>
-    </section>
+  <section class="tab-panel items-view" id="viewItems" hidden>
+    <div class="items-layout">
+      <!-- Left: Item-Tree -->
+      <section class="panel tree-panel" aria-label="Item-Tree">
+        <div class="panel-label-row">
+          <div class="panel-label">Item-Tree</div>
+          <button type="button" class="import-btn btn-sm" data-action="new-project">New Project</button>
+        </div>
+        <div class="project-row" id="projectRow">
+          <label class="field-label" for="projectSelect">Project:</label>
+          <select class="field input-text" id="projectSelect" aria-label="Project"></select>
+        </div>
+        <div class="tree-scroll" id="treeScroll">
+          <div class="tree" id="tree" role="tree" aria-label="Item-Tree"></div>
+          <div class="empty-state" id="treeEmpty" hidden></div>
+        </div>
+      </section>
+      <!-- Right: Items of the selected node -->
+      <section class="panel items-panel" aria-label="Items">
+        <div class="panel-label-row">
+          <div class="panel-label">Items</div>
+          <span class="muted-note" id="itemsNodeLabel"></span>
+        </div>
+        <div class="toolbar" id="itemsToolbar" hidden>
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+            <input id="itemFilter" type="text" placeholder="Search items…" aria-label="Search items">
+          </div>
+          <div class="toolbar-right">
+            <button type="button" class="import-btn" id="btnNewItem" data-action="new-item">New</button>
+          </div>
+        </div>
+        <div class="items-scroll" id="itemsScroll">
+          <table class="data-table items-table" id="itemsTable" hidden>
+            <thead id="itemsHead"></thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+          <div class="empty-state" id="itemsEmpty" hidden></div>
+          <div class="loading-state" id="itemsLoading" hidden><span class="spinner" aria-hidden="true"></span>Loading items…</div>
+        </div>
+      </section>
+    </div>
   </section>
 
   <!-- ---------- Cards ---------- -->
@@ -655,6 +771,50 @@ footer{ text-align:center; color:var(--muted); font-size:11.5px; padding:0 24px 
   </div>
 </div>
 
+<!-- ==================== NODE MODAL ==================== -->
+<div id="nodeModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-narrow" role="dialog" aria-modal="true" aria-labelledby="nodeModalTitle">
+    <div class="modal-header">
+      <h2 id="nodeModalTitle">New Node</h2>
+      <button type="button" class="modal-close" data-close="node" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-wrap">
+        <label class="field-label" for="nName">Name <span class="req">*</span></label>
+        <input class="field input-text" id="nName" type="text" maxlength="255" autocomplete="off">
+        <div class="field-msg" id="nNameMsg"></div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label" for="nType">Type</label>
+        <select class="field input-text" id="nType"></select>
+        <div class="field-msg" id="nTypeMsg"></div>
+      </div>
+      <div class="form-error" id="nodeFormError"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="import-btn secondary" data-close="node">Cancel</button>
+      <button type="button" class="import-btn" id="btnSaveNode" data-action="save-node">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ITEM MODAL ==================== -->
+<div id="itemModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-wide modal-full" role="dialog" aria-modal="true" aria-labelledby="itemModalTitle">
+    <div class="modal-header">
+      <h2 id="itemModalTitle">New Item</h2>
+      <button type="button" class="modal-close" data-close="item" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="item-tabs" id="itemTabs" role="tablist" hidden></div>
+    <div class="modal-body" id="itemFormBody"></div>
+    <div class="modal-footer">
+      <span class="form-error" id="itemFormError"></span>
+      <button type="button" class="import-btn secondary" data-close="item">Cancel</button>
+      <button type="button" class="import-btn" id="btnSaveItem" data-action="save-item">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== CONFIRM MODAL ==================== -->
 <div id="confirmModal" class="modal-overlay" hidden>
   <div class="modal-box modal-narrow" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -709,6 +869,8 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
         checkbox → {"default":true|false}
         icon / text / enum / tab / separator → NULL
     - tab / separator carry no value: is_key is always 0 and visibility always 'show'.
+    - nodes form the Item-Tree: parent_id NULL = root (Project); card_id NULL = "Folder", else a Card node.
+      sort_order orders siblings (roots: the parent_id IS NULL group). items.sort_order orders a node's Items.
     - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f;
       checkbox stored as '0' / '1').
   Future (Supabase phase, not created here):
@@ -758,14 +920,30 @@ CREATE TABLE IF NOT EXISTS enum_values (
   UNIQUE (property_id, value_normalized)
 );
 
+CREATE TABLE IF NOT EXISTS nodes (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL DEFAULT 'sqlite',
+  parent_id   TEXT REFERENCES nodes (id) ON DELETE CASCADE,
+  name        TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 255),
+  card_id     TEXT REFERENCES cards (id) ON DELETE SET NULL,
+  sort_order  INTEGER NOT NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes (parent_id);
+CREATE INDEX IF NOT EXISTS idx_nodes_card ON nodes (card_id);
+
 CREATE TABLE IF NOT EXISTS items (
   id          TEXT PRIMARY KEY,
   card_id     TEXT NOT NULL REFERENCES cards (id) ON DELETE CASCADE,
+  node_id     TEXT NOT NULL REFERENCES nodes (id) ON DELETE CASCADE,
   user_id     TEXT NOT NULL DEFAULT 'sqlite',
+  sort_order  INTEGER NOT NULL,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_card ON items (card_id);
+CREATE INDEX IF NOT EXISTS idx_items_node ON items (node_id);
 
 CREATE TABLE IF NOT EXISTS item_values (
   id           TEXT PRIMARY KEY,
@@ -784,7 +962,7 @@ CREATE TABLE IF NOT EXISTS item_values (
   db.run()/db.exec() directly. In the Supabase phase, the bodies of these
   functions are replaced with Supabase client calls; their signatures stay.
 */
-const SCHEMA_VERSION = 3;   // 1 = RC1–RC4, 2 = RC5 (hex + properties.config), 3 = RC6 (tab, separator, percent, checkbox)
+const SCHEMA_VERSION = 4;   // 1 = RC1–RC4, 2 = RC5 (hex + properties.config), 3 = RC6 (tab, separator, percent, checkbox), 4 = nodes + items.node_id/sort_order
 const USER_ID = 'sqlite';
 const PROPERTY_TYPES = ['icon', 'text', 'number', 'hex', 'enum', 'date', 'tab', 'separator', 'percent', 'checkbox'];
 /** Layout-only types: no value, not counted as properties, no Key / Visibility. */
@@ -891,10 +1069,12 @@ function dbOpenBytes(bytes){
 
 /* ---------- Schema migrations (SQLite-specific; NOT part of the schema block) ----------
    Each step upgrades from version (n-1) to n. Data is always preserved. */
-function propertiesDdl(tableName){
-  const m = SCHEMA_SQL.match(/CREATE TABLE IF NOT EXISTS properties \([\s\S]*?\n\);/);
-  return m[0].replace('CREATE TABLE IF NOT EXISTS properties (', `CREATE TABLE ${tableName} (`);
+/** CREATE TABLE statement of one table from the schema block, optionally under another name. */
+function tableDdl(table, asName = null){
+  const m = SCHEMA_SQL.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`));
+  return asName ? m[0].replace(`CREATE TABLE IF NOT EXISTS ${table} (`, `CREATE TABLE ${asName} (`) : m[0];
 }
+function propertiesDdl(tableName){ return tableDdl('properties', tableName); }
 /* SQLite can't change a CHECK constraint in place, so the properties table is rebuilt with the
    current definition (official 12-step procedure). Both copy statements are fixed strings. */
 const COPY_PROPERTIES_SQL = {
@@ -922,6 +1102,35 @@ const MIGRATIONS = {
   2(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.fromV1); },
   // v3 (RC6): 'tab', 'separator', 'percent', 'checkbox' types. Existing data is copied unchanged.
   3(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.asIs); },
+  // v4: Item-Tree. Adds the nodes table and rebuilds items with node_id + sort_order.
+  // Earlier versions had no UI to create Items, so items is normally empty. If a file does contain
+  // Items, they are kept: each Card's Items go to a Card node under a root named "Recovered Items".
+  4(){
+    db.exec(tableDdl('nodes'));
+    db.exec(tableDdl('items', 'items_new'));
+    const old = q('SELECT id, card_id, user_id, created_at, updated_at FROM items ORDER BY created_at, id');
+    if (old.length){
+      const t = nowIso(), root = newId();
+      exec('INSERT INTO nodes (id, user_id, parent_id, name, card_id, sort_order, created_at, updated_at) VALUES (?, ?, NULL, ?, NULL, ?, ?, ?)',
+        [root, USER_ID, 'Recovered Items', (q1('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM nodes WHERE parent_id IS NULL') || { n: 0 }).n, t, t]);
+      const nodeForCard = {}; let ord = 0;
+      q(`SELECT DISTINCT c.id, c.name FROM items i JOIN cards c ON c.id = i.card_id ORDER BY lower(c.name)`).forEach(c => {
+        const nid = newId(); nodeForCard[c.id] = nid;
+        exec('INSERT INTO nodes (id, user_id, parent_id, name, card_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [nid, USER_ID, root, c.name, c.id, ord++, t, t]);
+      });
+      const seq = {};
+      old.forEach(it => {
+        const nid = nodeForCard[it.card_id]; if (!nid) return;
+        seq[nid] = (seq[nid] || 0);
+        exec('INSERT INTO items_new (id, card_id, node_id, user_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [it.id, it.card_id, nid, it.user_id, seq[nid]++, it.created_at, it.updated_at]);
+      });
+    }
+    exec('DROP TABLE items');
+    exec('ALTER TABLE items_new RENAME TO items');
+    exec('DELETE FROM item_values WHERE item_id NOT IN (SELECT id FROM items)');
+  },
 };
 function dbMigrate(fromVersion){
   // Foreign keys must be off while a referenced table is rebuilt, otherwise dropping it
@@ -1044,7 +1253,7 @@ function parsePropertyConfig(type, text){
   try { return validatePropertyConfig(type, raw); } catch (_) { return defaultPropertyConfig(type); }
 }
 
-/* ---------- ITEM VALUE VALIDATION SPEC (Section 8.1) — Item phase, NOT applied in Phase-1 ----------
+/* ---------- ITEM VALUE VALIDATION SPEC — applied by validateItemValue() (Item form + adapter) ----------
    The Item form (Items tab) must validate every value with these rules before saving, in the UI
    (live, field-level English messages) AND again in the adapter right before the write. */
 const ITEM_VALUE_RULES = Object.freeze({
@@ -1065,7 +1274,7 @@ const ITEM_VALUE_RULES = Object.freeze({
   checkbox:  { accepts: [true, false], storeAs: "'1' / '0'", initialValue: 'config.default for a new Item' },
 });
 
-/* ---------- TAB LAYOUT SPEC — Item phase, NOT rendered in Phase-1 ----------
+/* ---------- TAB LAYOUT — implemented by groupPropertiesIntoTabs() for the Item form ----------
    Properties are processed in sort_order:
    - Everything before the first 'tab' property goes into a fixed tab named "Main" (not stored, not renamable).
    - Each 'tab' property opens a new tab (its label is the tab name) holding the properties after it,
@@ -1118,8 +1327,15 @@ function updateCard(id, input){
 }
 function disableCard(id){ exec('UPDATE cards SET is_disabled = 1, updated_at = ? WHERE id = ? AND user_id = ?', [nowIso(), id, USER_ID]); }
 function recoverCard(id){ exec('UPDATE cards SET is_disabled = 0, updated_at = ? WHERE id = ? AND user_id = ?', [nowIso(), id, USER_ID]); }
-/** Permanent delete. Properties, enum values, items and item values go with it (ON DELETE CASCADE). */
-function purgeCard(id){ tx(() => exec('DELETE FROM cards WHERE id = ? AND user_id = ?', [id, USER_ID])); }
+/** Permanent delete of a Card WITHOUT Items. Properties and enum values go with it (ON DELETE CASCADE);
+ *  nodes linked to it become Folders (nodes.card_id ON DELETE SET NULL). */
+function purgeCard(id){
+  tx(() => {
+    if (countItemsForCard(id) > 0) throw new CmapError('has_items', 'This Card has Items and cannot be purged. Delete its Items first.');
+    exec('DELETE FROM cards WHERE id = ? AND user_id = ?', [id, USER_ID]);
+  });
+}
+function countItemsForCard(cardId){ return q1('SELECT COUNT(*) AS n FROM items WHERE card_id = ?', [cardId]).n; }
 
 /* ---------- Properties ---------- */
 function readProperties(cardId){
@@ -1188,6 +1404,248 @@ function upsertEnumValue(propertyId, value, { countUsage = true } = {}){
   exec(`INSERT INTO enum_values (id, property_id, value, value_normalized, usage_count, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
     [id, propertyId, v, n, countUsage ? 1 : 0, nowIso()]);
   return { id, value: v, created: true };
+}
+
+/* ---------- Item value validation (Section 3) ----------
+   Returns { value } with the normalized string to store (null = empty, no ItemValue row) or { error }. */
+function isRealDate(y, m, d){ const dt = new Date(Date.UTC(y, m - 1, d)); return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d; }
+function validateItemValue(prop, raw){
+  const cfg = prop.config || defaultPropertyConfig(prop.type) || {};
+  switch (prop.type){
+    case 'tab': case 'separator': return { value: null };
+    case 'text': { const v = sanitizeText(raw).trim(); return { value: v || null }; }
+    case 'number': {
+      const v = sanitizeText(raw).trim(); if (!v) return { value: null };
+      if (cfg.kind === 'decimal') return ITEM_VALUE_RULES.number.decimal.test(v) || ITEM_VALUE_RULES.number.integer.test(v)
+        ? { value: v } : { error: 'Enter a number. Use a dot (.) for decimals.' };
+      return ITEM_VALUE_RULES.number.integer.test(v) ? { value: v } : { error: 'Enter a whole number.' };
+    }
+    case 'hex': {
+      const v = sanitizeText(raw).trim();
+      if (!v || v === '0x') return { value: null };
+      if (!v.startsWith('0x')) return { error: 'Hex values must start with 0x.' };
+      const digits = v.slice(2);
+      if (!ITEM_VALUE_RULES.hex.digits.test(digits)) return { error: 'Use only 0–9 and a–f after 0x.' };
+      if (cfg.min_length != null && digits.length < cfg.min_length) return { error: `Enter at least ${cfg.min_length} hex digit${cfg.min_length === 1 ? '' : 's'}.` };
+      if (cfg.max_length != null && digits.length > cfg.max_length) return { error: `Enter at most ${cfg.max_length} hex digit${cfg.max_length === 1 ? '' : 's'}.` };
+      return { value: '0x' + digits.toLowerCase() };
+    }
+    case 'date': {
+      const v = sanitizeText(raw).trim(); if (!v) return { value: null };
+      const m = cfg.include_time ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(v) : /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+      if (!m) return { error: cfg.include_time ? 'Enter a date and a time.' : 'Enter a valid date.' };
+      if (!isRealDate(+m[1], +m[2], +m[3])) return { error: 'Enter a valid date.' };
+      if (cfg.include_time && (+m[4] > 23 || +m[5] > 59)) return { error: 'Enter a valid time.' };
+      return { value: v };
+    }
+    case 'percent': {
+      const v = sanitizeText(raw).trim(); if (!v) return { value: null };
+      if (!ITEM_VALUE_RULES.percent.integer.test(v)) return { error: 'Enter a whole number.' };
+      const n = Number(v), mn = cfg.min ?? 0, mx = cfg.max ?? 100;
+      if (n < mn || n > mx) return { error: `Enter a value from ${mn} to ${mx}.` };
+      return { value: String(n) };
+    }
+    case 'checkbox': {
+      if (raw === true || raw === 1 || raw === '1') return { value: '1' };
+      if (raw === false || raw === 0 || raw === '0' || raw == null || raw === '') return { value: '0' };
+      return { error: 'Must be checked or unchecked.' };
+    }
+    case 'enum': {
+      const v = sanitizeText(raw).trim(); if (!v) return { value: null };
+      if (v.length > MAX_LEN) return { error: 'At most 255 characters.' };
+      return { value: v };
+    }
+    case 'icon': {
+      const v = sanitizeText(raw).trim(); if (!v) return { value: null };
+      return iconExists(v) ? { value: v } : { error: 'Pick an icon from the list.' };
+    }
+  }
+  return { error: 'Unknown property type.' };
+}
+/** Splits properties (in sort_order) into form tabs: everything before the first 'tab' goes to "Main". */
+function groupPropertiesIntoTabs(props){
+  const tabs = [{ name: MAIN_TAB_NAME, key: 'main', props: [] }];
+  props.forEach(p => {
+    if (p.type === 'tab') tabs.push({ name: p.label, key: p.id, props: [] });
+    else tabs[tabs.length - 1].props.push(p);
+  });
+  return tabs;
+}
+
+/* ---------- Nodes (Item-Tree) ---------- */
+function cleanNodeName(name){
+  const v = sanitizeText(name).trim();
+  if (!v) throw new CmapError('invalid', 'Name is required.');
+  if (v.length > MAX_LEN) throw new CmapError('invalid', 'Name can be at most 255 characters.');
+  return v;
+}
+function readProjects(){
+  return q('SELECT id, name, card_id, sort_order FROM nodes WHERE parent_id IS NULL AND user_id = ? ORDER BY sort_order, lower(name), id', [USER_ID]);
+}
+/** Whole subtree of a root as a flat list (parents before children), with Card info and direct Item counts. */
+function readNodeTree(rootId){
+  return q(`
+    WITH RECURSIVE sub (id, depth) AS (
+      SELECT id, 0 FROM nodes WHERE id = ? AND user_id = ?
+      UNION ALL
+      SELECT n.id, sub.depth + 1 FROM nodes n JOIN sub ON n.parent_id = sub.id
+    )
+    SELECT n.id, n.parent_id, n.name, n.card_id, n.sort_order, sub.depth,
+           c.name AS card_name, c.is_disabled AS card_disabled,
+           (SELECT COUNT(*) FROM items i WHERE i.node_id = n.id) AS item_count
+    FROM sub JOIN nodes n ON n.id = sub.id
+    LEFT JOIN cards c ON c.id = n.card_id
+    ORDER BY sub.depth, n.sort_order, lower(n.name), n.id`, [rootId, USER_ID]);
+}
+function readNode(id){
+  return q1(`SELECT n.*, c.name AS card_name, c.is_disabled AS card_disabled,
+                    (SELECT COUNT(*) FROM items i WHERE i.node_id = n.id) AS item_count
+             FROM nodes n LEFT JOIN cards c ON c.id = n.card_id WHERE n.id = ? AND n.user_id = ?`, [id, USER_ID]);
+}
+function nodeExists(id){ return typeof id === 'string' && !!q1('SELECT 1 AS x FROM nodes WHERE id = ? AND user_id = ?', [id, USER_ID]); }
+function nodeHasItems(id){ return !!q1('SELECT 1 AS x FROM items WHERE node_id = ? LIMIT 1', [id]); }
+/** Number of nodes below a node and Items in the node + its whole subtree. */
+function nodeSubtreeStats(id){
+  return q1(`
+    WITH RECURSIVE sub (id) AS (SELECT id FROM nodes WHERE id = ? UNION ALL SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id)
+    SELECT (SELECT COUNT(*) FROM sub) - 1 AS descendants,
+           (SELECT COUNT(*) FROM items WHERE node_id IN (SELECT id FROM sub)) AS items`, [id]);
+}
+function isInSubtree(rootId, candidateId){
+  return !!q1(`
+    WITH RECURSIVE sub (id) AS (SELECT id FROM nodes WHERE id = ? UNION ALL SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id)
+    SELECT 1 AS x FROM sub WHERE id = ?`, [rootId, candidateId]);
+}
+function checkNodeCard(cardId, currentCardId = null){
+  if (cardId == null) return null;
+  const c = q1('SELECT id, is_disabled FROM cards WHERE id = ? AND user_id = ?', [cardId, USER_ID]);
+  if (!c) throw new CmapError('invalid', 'That Card doesn\u2019t exist.');
+  if (c.is_disabled && cardId !== currentCardId) throw new CmapError('invalid', 'Disabled Cards can\u2019t be used for nodes.');
+  return cardId;
+}
+function createNode({ parent_id = null, name, card_id = null }){
+  const nm = cleanNodeName(name);
+  return tx(() => {
+    if (parent_id != null && !nodeExists(parent_id)) throw new CmapError('not_found', 'The parent node doesn\u2019t exist.');
+    const card = checkNodeCard(card_id);
+    const next = parent_id == null
+      ? q1('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM nodes WHERE parent_id IS NULL AND user_id = ?', [USER_ID]).n
+      : q1('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM nodes WHERE parent_id = ?', [parent_id]).n;
+    const id = newId(), t = nowIso();
+    exec('INSERT INTO nodes (id, user_id, parent_id, name, card_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, USER_ID, parent_id, nm, card, next, t, t]);
+    return id;
+  });
+}
+function updateNode(id, { name, card_id = null }){
+  const nm = cleanNodeName(name);
+  tx(() => {
+    const cur = readNode(id);
+    if (!cur) throw new CmapError('not_found', 'Node not found.');
+    if ((cur.card_id || null) !== (card_id || null) && cur.item_count > 0)
+      throw new CmapError('type_locked', 'This node has Items, so its type cannot be changed.');
+    const card = checkNodeCard(card_id, cur.card_id);
+    exec('UPDATE nodes SET name = ?, card_id = ?, updated_at = ? WHERE id = ?', [nm, card, nowIso(), id]);
+  });
+}
+/** Moves a (non-root) node under newParentId at position index (0-based among the new siblings). */
+function moveNode(id, newParentId, index){
+  tx(() => {
+    const node = q1('SELECT id, parent_id FROM nodes WHERE id = ? AND user_id = ?', [id, USER_ID]);
+    if (!node) throw new CmapError('not_found', 'Node not found.');
+    if (node.parent_id == null) throw new CmapError('invalid', 'Projects can\u2019t be moved.');
+    if (newParentId == null || !nodeExists(newParentId)) throw new CmapError('invalid', 'Pick a node to move it into.');
+    if (isInSubtree(id, newParentId)) throw new CmapError('invalid', 'A node can\u2019t be moved into itself or its own sub-nodes.');
+    const siblings = q('SELECT id FROM nodes WHERE parent_id = ? AND id <> ? ORDER BY sort_order, lower(name), id', [newParentId, id]).map(r => r.id);
+    const at = Math.max(0, Math.min(Number.isInteger(index) ? index : siblings.length, siblings.length));
+    siblings.splice(at, 0, id);
+    const t = nowIso();
+    exec('UPDATE nodes SET parent_id = ?, updated_at = ? WHERE id = ?', [newParentId, t, id]);
+    siblings.forEach((sid, i) => exec('UPDATE nodes SET sort_order = ? WHERE id = ?', [i, sid]));
+    if (node.parent_id !== newParentId){
+      q('SELECT id FROM nodes WHERE parent_id = ? ORDER BY sort_order, lower(name), id', [node.parent_id])
+        .forEach((r, i) => exec('UPDATE nodes SET sort_order = ? WHERE id = ?', [i, r.id]));
+    }
+  });
+}
+/** Deletes a node with its whole subtree and all their Items / ItemValues (ON DELETE CASCADE). */
+function deleteNodeSubtree(id){ tx(() => exec('DELETE FROM nodes WHERE id = ? AND user_id = ?', [id, USER_ID])); }
+
+/* ---------- Items ---------- */
+/** Direct Items of a node, in order, each with { values: { property_id: value } }. */
+function readItems(nodeId){
+  const items = q('SELECT id, card_id, node_id, sort_order, created_at, updated_at FROM items WHERE node_id = ? AND user_id = ? ORDER BY sort_order, created_at, id', [nodeId, USER_ID]);
+  const byId = {}; items.forEach(it => { it.values = {}; byId[it.id] = it; });
+  q(`SELECT v.item_id, v.property_id, v.value FROM item_values v JOIN items i ON i.id = v.item_id WHERE i.node_id = ?`, [nodeId])
+    .forEach(r => { if (byId[r.item_id]) byId[r.item_id].values[r.property_id] = r.value; });
+  return items;
+}
+function readItem(id){
+  const it = q1('SELECT id, card_id, node_id, sort_order FROM items WHERE id = ? AND user_id = ?', [id, USER_ID]);
+  if (!it) return null;
+  it.values = {};
+  q('SELECT property_id, value FROM item_values WHERE item_id = ?', [id]).forEach(r => { it.values[r.property_id] = r.value; });
+  return it;
+}
+/**
+ * Validates and saves an Item with all its values in one transaction.
+ * input = { id?, node_id, values: { property_id: raw } }. Returns { id } or throws CmapError
+ * with .fieldErrors = { property_id: message } when values are invalid.
+ */
+function saveItem(input){
+  return tx(() => {
+    const existing = input.id ? readItem(input.id) : null;
+    if (input.id && !existing) throw new CmapError('not_found', 'Item not found.');
+    const nodeId = existing ? existing.node_id : input.node_id;
+    const node = readNode(nodeId);
+    if (!node) throw new CmapError('not_found', 'Node not found.');
+    if (!node.card_id) throw new CmapError('invalid', 'Folder nodes can\u2019t hold Items.');
+    if (node.card_disabled) throw new CmapError('card_disabled', 'This Card is disabled.');
+    const props = readProperties(node.card_id);
+    const clean = {}, fieldErrors = {};
+    props.forEach(p => {
+      const raw = (input.values || {})[p.id];
+      const r = validateItemValue(p, p.type === 'checkbox' && raw === undefined ? !!(p.config && p.config.default) : raw);
+      if (r.error) fieldErrors[p.id] = r.error; else if (r.value != null) clean[p.id] = r.value;
+    });
+    if (Object.keys(fieldErrors).length){ const e = new CmapError('invalid', 'Please fix the highlighted fields.'); e.fieldErrors = fieldErrors; throw e; }
+    const t = nowIso();
+    let id = input.id;
+    if (existing){
+      exec('UPDATE items SET updated_at = ? WHERE id = ?', [t, id]);
+    } else {
+      id = newId();
+      const next = q1('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM items WHERE node_id = ?', [nodeId]).n;
+      exec('INSERT INTO items (id, card_id, node_id, user_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, node.card_id, nodeId, USER_ID, next, t, t]);
+    }
+    const before = existing ? existing.values : {};
+    exec('DELETE FROM item_values WHERE item_id = ?', [id]);
+    props.forEach(p => {
+      if (!(p.id in clean)) return;
+      let v = clean[p.id];
+      if (p.type === 'enum'){
+        // New values join this property's suggestions; usage_count grows whenever a value is (newly) chosen.
+        const changed = normalizeEnumValue(before[p.id] || '') !== normalizeEnumValue(v);
+        v = upsertEnumValue(p.id, v, { countUsage: changed }).value;
+      }
+      exec('INSERT INTO item_values (id, item_id, property_id, value) VALUES (?, ?, ?, ?)', [newId(), id, p.id, v]);
+    });
+    return { id };
+  });
+}
+function deleteItem(id){ tx(() => exec('DELETE FROM items WHERE id = ? AND user_id = ?', [id, USER_ID])); }
+/** Rewrites the order of a node's Items. orderedIds must be exactly that node's Items. */
+function reorderItems(nodeId, orderedIds){
+  tx(() => {
+    const have = q('SELECT id FROM items WHERE node_id = ?', [nodeId]).map(r => r.id).sort();
+    const want = [...orderedIds].sort();
+    if (have.length !== want.length || have.some((v, i) => v !== want[i])) throw new CmapError('invalid', 'Items can only be reordered within their node.');
+    orderedIds.forEach((iid, i) => exec('UPDATE items SET sort_order = ? WHERE id = ?', [i, iid]));
+  });
+}
+function readActiveCardsForNodes(){
+  return q('SELECT id, name FROM cards WHERE user_id = ? AND is_disabled = 0 ORDER BY lower(name)', [USER_ID]);
 }
 // ---- DB ADAPTER END ----
 
@@ -1705,6 +2163,7 @@ function setSaveState(state){
 
 /* ---------- Views ---------- */
 function showWelcome(){
+  document.body.classList.remove('items-mode');
   $('#dbActionsClosed').hidden = false;
   $('#dbActionsOpen').hidden = true;
   $('#tabs').hidden = true;
@@ -1730,7 +2189,9 @@ function setTab(tab){
   $('#viewMap').hidden = tab !== 'map';
   $('#viewItems').hidden = tab !== 'items';
   $('#viewCards').hidden = tab !== 'cards';
+  document.body.classList.toggle('items-mode', tab === 'items');
   if (tab === 'cards') renderCards();
+  if (tab === 'items') renderItemsTab();
 }
 async function refreshReopen(){
   const btn = $('#reopenBtn');
@@ -1814,7 +2275,7 @@ function renderCards(){
       <td class="num">${c.property_count}</td>
       <td class="num">${c.record_count}</td>
       <td class="act row-actions"><span class="act-pair">${dis ? `
-          <button type="button" class="tbtn purge" data-row-action="purge" title="Purge — delete permanently" aria-label="Purge">${ICO.purge}</button>
+          <button type="button" class="tbtn purge" data-row-action="purge" ${c.record_count > 0 ? 'disabled title="This Card has Items and cannot be purged. Delete its Items first."' : 'title="Purge — delete permanently"'} aria-label="Purge">${ICO.purge}</button>
           <button type="button" class="tbtn recover" data-row-action="recover" title="Recover — make active again" aria-label="Recover">${ICO.recover}</button>` : `
           <button type="button" class="tbtn" data-row-action="edit" title="Edit Card" aria-label="Edit">${ICO.edit}</button>
           <button type="button" class="tbtn danger" data-row-action="disable" title="Disable Card" aria-label="Disable">${ICO.del}</button>`}
@@ -1841,7 +2302,7 @@ async function onRowAction(action, id){
   if (action === 'disable'){
     const r = await showConfirm({
       title: 'Disable Card',
-      text: `Are you sure you want to disable "${card.name}"? Its Items are kept, but hidden until you recover the Card.`,
+      text: `Are you sure you want to disable "${card.name}"? Its Items are kept and stay visible, but new Items can\u2019t be added or edited until you recover the Card.`,
       actions: [{ label: 'Cancel', value: null }, { label: 'Disable', value: 'ok', kind: 'danger' }],
     });
     if (!r) return;
@@ -1851,7 +2312,7 @@ async function onRowAction(action, id){
   } else if (action === 'purge'){
     const r = await showConfirm({
       title: 'Purge Card',
-      text: `This action cannot be undone. "${card.name}" and all its Items (${card.record_count}) will be permanently deleted.`,
+      text: 'This action cannot be undone. This Card will be permanently deleted. Nodes linked to this Card will become Folders.',
       actions: [{ label: 'Cancel', value: null }, { label: 'Purge permanently', value: 'ok', kind: 'danger' }],
     });
     if (!r) return;
@@ -2075,6 +2536,10 @@ function wire(){
           return;
         }
         case 'save-card': return saveCardFromForm();
+        case 'new-project': return openNodeModal({ mode: 'project' });
+        case 'save-node': return saveNodeFromForm();
+        case 'new-item': return tree.selectedId && openItemModal(tree.selectedId, null);
+        case 'save-item': return saveItemFromForm();
       }
     }
     const rowBtn = e.target.closest('[data-row-action]');
@@ -2103,6 +2568,8 @@ function wire(){
       const which = closer.dataset.close;
       if (which === 'card') return requestCloseCardModal();
       if (which === 'confirm') return confirmResolver && confirmResolver(null);
+      if (which === 'node') return closeModal('nodeModal');
+      if (which === 'item') return requestCloseItemModal();
     }
     // Menu: close when clicking elsewhere
     if (!e.target.closest('.menu-wrap')){ $('#menuDropdown').hidden = true; $('#btnMenu').setAttribute('aria-expanded', 'false'); }
@@ -2121,6 +2588,7 @@ function wire(){
   });
 
   $$('.tab').forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  wireItems();
 
   $$('.cards-table th[data-sort] .sort-btn').forEach(b => b.addEventListener('click', () => setCardSort(b.closest('th').dataset.sort)));
   $('#cardFilter').addEventListener('input', (e) => { ui.filter = sanitizeText(e.target.value); renderCards(); });
@@ -2171,6 +2639,503 @@ function wire(){
 
   window.addEventListener('beforeunload', (e) => {
     if (dbIsOpen() && store.dirty){ e.preventDefault(); e.returnValue = ''; }
+  });
+}
+
+/* ==================== ITEMS TAB: Item-Tree + Items ==================== */
+const TICO = {
+  chev:   '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/></svg>',
+  card:   '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 10h9M7.5 14h5"/></svg>',
+  plus:   '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  grip:   '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>',
+  boxOn:  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Checked"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.8 2.8L16 9.5"/></svg>',
+  boxOff: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-label="Unchecked"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>',
+};
+const tree = { projectId: null, selectedId: null, expanded: new Set(), nodes: [], byId: {}, kids: {}, drag: null };
+const itemsUi = { filter: '', drag: null, props: [], node: null };
+
+/* ---------- UI state in localStorage (keyed by database file name; read as untrusted input) ---------- */
+function treeStateKey(){ return 'cmap-ui:' + (store.fileName || DEFAULT_DB_NAME); }
+const SAFE_ID = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64 && /^[A-Za-z0-9_-]+$/.test(v);
+function loadTreeState(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(treeStateKey()) || 'null'); } catch (_) { raw = null; }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) raw = {};
+  tree.projectId = SAFE_ID(raw.project) ? raw.project : null;
+  tree.selectedId = SAFE_ID(raw.selected) ? raw.selected : null;
+  tree.expanded = new Set(Array.isArray(raw.expanded) ? raw.expanded.filter(SAFE_ID).slice(0, 5000) : []);
+}
+function saveTreeState(){
+  try { localStorage.setItem(treeStateKey(), JSON.stringify({ project: tree.projectId, selected: tree.selectedId, expanded: [...tree.expanded] })); } catch (_) {}
+}
+
+/* ---------- Tree ---------- */
+function loadTree(){
+  const projects = readProjects();
+  if (!projects.some(p => p.id === tree.projectId)) tree.projectId = projects.length ? projects[0].id : null;
+  tree.nodes = tree.projectId ? readNodeTree(tree.projectId) : [];
+  tree.byId = {}; tree.kids = {};
+  tree.nodes.forEach(n => { tree.byId[n.id] = n; (tree.kids[n.parent_id || ''] = tree.kids[n.parent_id || ''] || []).push(n.id); });
+  if (tree.selectedId && !tree.byId[tree.selectedId]) tree.selectedId = null;
+  // forget expanded ids that are no longer in this project
+  tree.expanded = new Set([...tree.expanded].filter(id => tree.byId[id] || !tree.projectId || nodeExists(id)));
+  return projects;
+}
+function inLocalSubtree(rootId, id){
+  for (let cur = tree.byId[id]; cur; cur = tree.byId[cur.parent_id]) if (cur.id === rootId) return true;
+  return false;
+}
+function renderItemsTab(){
+  if (!dbIsOpen()) return;
+  const projects = loadTree();
+  const sel = $('#projectSelect');
+  sel.innerHTML = '';
+  projects.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
+  sel.disabled = !projects.length;
+  $('#projectRow').hidden = !projects.length;
+  if (tree.projectId) sel.value = tree.projectId;
+  renderTree(projects.length === 0);
+  renderItemsPanel(projects.length === 0);
+  saveTreeState();
+}
+function renderTree(noProjects){
+  const box = $('#tree'), empty = $('#treeEmpty');
+  if (noProjects){
+    box.innerHTML = '';
+    empty.innerHTML = '<strong>No projects yet</strong><br>Create a Project to start your Item-Tree.<br><button type="button" class="import-btn" data-action="new-project">New Project</button>';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  const out = [];
+  const walk = (id) => {
+    const n = tree.byId[id]; if (!n) return;
+    const kids = tree.kids[id] || [];
+    const open = tree.expanded.has(id);
+    const isRoot = n.parent_id == null;
+    out.push(`<div class="tree-row${tree.selectedId === id ? ' selected' : ''}" role="treeitem" data-id="${esc(id)}" draggable="${isRoot ? 'false' : 'true'}"
+        aria-level="${n.depth + 1}" aria-selected="${tree.selectedId === id}" ${kids.length ? `aria-expanded="${open}"` : ''} style="padding-left:${6 + n.depth * 16}px">
+      <button type="button" class="tree-toggle${kids.length ? '' : ' leaf'}" data-tree-action="toggle" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'}" tabindex="-1">${TICO.chev}</button>
+      <span class="tree-ico${n.card_id ? ' card' : ''}" title="${n.card_id ? 'Card' : 'Folder'}">${n.card_id ? TICO.card : TICO.folder}</span>
+      <span class="tree-name">${esc(n.name)}</span>
+      ${n.card_id ? `<span class="tree-card${n.card_disabled ? ' disabled' : ''}" title="${n.card_disabled ? 'This Card is disabled' : 'Card'}">${esc(n.card_name)}</span>` : ''}
+      <span class="tree-acts">
+        <button type="button" class="tbtn" data-tree-action="add" title="Add sub-node" aria-label="Add sub-node">${TICO.plus}</button>
+        <button type="button" class="tbtn" data-tree-action="edit" title="Edit node" aria-label="Edit node">${ICO.edit}</button>
+        <button type="button" class="tbtn danger" data-tree-action="delete" title="Delete node" aria-label="Delete node">${ICO.del}</button>
+      </span>
+    </div>`);
+    if (open) kids.forEach(walk);
+  };
+  if (tree.projectId) walk(tree.projectId);
+  box.innerHTML = out.join('');
+}
+function selectNode(id){
+  tree.selectedId = id; itemsUi.filter = ''; $('#itemFilter').value = '';
+  saveTreeState();
+  $$('#tree .tree-row').forEach(r => { const on = r.dataset.id === id; r.classList.toggle('selected', on); r.setAttribute('aria-selected', String(on)); });
+  renderItemsPanel(false);
+}
+
+/* ---------- Items panel ---------- */
+function itemsEmpty(html){
+  $('#itemsTable').hidden = true;
+  const e = $('#itemsEmpty'); e.innerHTML = html; e.hidden = false;
+}
+function formatCell(p, v){
+  if (v == null || v === '') return '<span class="cell-empty">\u2014</span>';
+  if (p.type === 'icon') return iconExists(v) ? `<span class="cell-icon" title="${esc(v)}">${renderIcon(v, 16)}</span>` : esc(v);
+  if (p.type === 'checkbox') return `<span class="cell-icon cell-check">${v === '1' ? TICO.boxOn : TICO.boxOff}</span>`;
+  if (p.type === 'percent') return esc(v) + '%';
+  return esc(v);
+}
+function cellText(p, v){
+  if (v == null) return '';
+  if (p.type === 'checkbox') return v === '1' ? 'checked true yes' : 'unchecked false no';
+  if (p.type === 'percent') return v + '%';
+  return String(v);
+}
+function renderItemsPanel(noProjects){
+  const label = $('#itemsNodeLabel'), bar = $('#itemsToolbar');
+  $('#itemsLoading').hidden = true;
+  label.textContent = '';
+  if (noProjects){ bar.hidden = true; return itemsEmpty('<strong>No projects yet</strong><br>Create a Project in the Item-Tree to get started.'); }
+  const n = tree.selectedId ? readNode(tree.selectedId) : null;
+  itemsUi.node = n;
+  if (!n){ bar.hidden = true; return itemsEmpty('Select a node from the Item-Tree'); }
+  label.textContent = n.card_id ? `${n.name} \u00b7 ${n.card_name}${n.card_disabled ? ' (disabled)' : ''}` : n.name;
+  if (!n.card_id){ bar.hidden = true; return itemsEmpty('This node is a Folder. Select a Card node to see its Items.'); }
+  bar.hidden = false;
+  $('#btnNewItem').hidden = !!n.card_disabled;
+  $('#itemsLoading').hidden = false;
+  let props, items;
+  try {
+    props = readProperties(n.card_id).filter(p => !isLayoutType(p.type) && p.visibility !== 'hide');
+    items = readItems(n.id);
+  } catch (e){ $('#itemsLoading').hidden = true; toast('Items couldn\u2019t be loaded: ' + e.message, { type: 'error' }); return; }
+  $('#itemsLoading').hidden = true;
+  itemsUi.props = props;
+  if (!items.length) return itemsEmpty('<strong>No Items yet</strong>' + (n.card_disabled ? 'This Card is disabled.' : 'Use \u201cNew\u201d to add the first one.'));
+  const f = sanitizeText(itemsUi.filter).trim().toLowerCase();
+  const shown = f ? items.filter(it => props.some(p => cellText(p, it.values[p.id]).toLowerCase().includes(f))) : items;
+  if (!shown.length) return itemsEmpty('No Items match your search');
+  $('#itemsEmpty').hidden = true;
+  $('#itemsTable').hidden = false;
+  const canReorder = !f;
+  $('#itemsHead').innerHTML = `<tr><th class="handle" aria-label="Reorder"></th>${props.map(p => `<th class="${p.type === 'number' || p.type === 'percent' ? 'num' : ''}">${esc(p.label)}</th>`).join('')}<th class="act">Actions</th></tr>`;
+  $('#itemsBody').innerHTML = shown.map(it => `<tr data-id="${esc(it.id)}">
+      <td class="handle"><span class="drag-handle" data-drag-handle="1" ${canReorder ? 'title="Drag to reorder"' : 'title="Clear the search to reorder" style="opacity:.35;cursor:not-allowed"'}>${TICO.grip}</span></td>
+      ${props.map(p => `<td class="cell-val${p.type === 'number' || p.type === 'percent' ? ' num' : ''}">${formatCell(p, it.values[p.id])}</td>`).join('')}
+      <td class="act"><span class="act-pair">
+        <button type="button" class="tbtn" data-item-action="edit" ${n.card_disabled ? 'disabled title="This Card is disabled"' : 'title="Edit Item"'} aria-label="Edit">${ICO.edit}</button>
+        <button type="button" class="tbtn danger" data-item-action="delete" title="Delete Item" aria-label="Delete">${ICO.del}</button>
+      </span></td>
+    </tr>`).join('');
+}
+
+/* ---------- Node form ---------- */
+const nodeForm = { mode: 'new', parentId: null, nodeId: null };
+function openNodeModal({ mode, parentId = null, nodeId = null }){
+  Object.assign(nodeForm, { mode, parentId, nodeId });
+  const node = nodeId ? readNode(nodeId) : null;
+  $('#nodeModalTitle').textContent = mode === 'project' ? 'New Project' : node ? 'Edit Node' : 'New Node';
+  $('#nName').value = node ? node.name : '';
+  const sel = $('#nType'); sel.innerHTML = '';
+  const add = (value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; sel.appendChild(o); return o; };
+  add('', 'Folder');
+  readActiveCardsForNodes().forEach(c => add(c.id, c.name));
+  if (node && node.card_id && node.card_disabled) add(node.card_id, `${node.card_name} (disabled)`);
+  sel.value = node && node.card_id ? node.card_id : '';
+  const locked = !!(node && node.item_count > 0);
+  sel.disabled = locked;
+  $('#nTypeMsg').textContent = locked ? 'This node has Items, so its type cannot be changed.' : '';
+  $('#nodeFormError').textContent = ''; $('#nNameMsg').textContent = ''; $('#nName').classList.remove('is-err');
+  openModal('nodeModal', () => closeModal('nodeModal'));
+  setTimeout(() => $('#nName').focus(), 0);
+}
+function validateNodeName(show){
+  const v = sanitizeText($('#nName').value).trim();
+  const msg = !v ? 'Name is required.' : v.length > MAX_LEN ? 'At most 255 characters.' : '';
+  $('#nName').classList.toggle('is-err', !!msg && show);
+  const m = $('#nNameMsg'); m.className = 'field-msg' + (msg && show ? ' err' : ''); m.textContent = show ? msg : '';
+  return !msg;
+}
+function saveNodeFromForm(){
+  if (!validateNodeName(true)) return;
+  const name = $('#nName').value, card_id = $('#nType').value || null;
+  try {
+    if (nodeForm.mode === 'edit'){
+      updateNode(nodeForm.nodeId, { name, card_id });
+    } else {
+      const id = createNode({ parent_id: nodeForm.mode === 'project' ? null : nodeForm.parentId, name, card_id });
+      if (nodeForm.mode === 'project'){ tree.projectId = id; tree.selectedId = id; }
+      else { tree.expanded.add(nodeForm.parentId); tree.selectedId = id; }
+    }
+  } catch (e){ $('#nodeFormError').textContent = e.message || 'The node couldn\u2019t be saved.'; return; }
+  closeModal('nodeModal');
+  markDirty(); renderItemsTab();
+}
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+async function deleteNodeFlow(id){
+  const n = readNode(id); if (!n) return;
+  const s = nodeSubtreeStats(id);
+  const r = await showConfirm({
+    title: n.parent_id == null ? 'Delete Project' : 'Delete node',
+    text: `This will permanently delete \u2018${sanitizeText(n.name)}\u2019, ${plural(s.descendants, 'sub-node', 'sub-nodes')} and ${plural(s.items, 'Item', 'Items')}. This action cannot be undone.`,
+    actions: [{ label: 'Cancel', value: null }, { label: 'Delete permanently', value: 'ok', kind: 'danger' }],
+  });
+  if (!r) return;
+  try { deleteNodeSubtree(id); } catch (e){ toast('Delete failed: ' + e.message, { type: 'error' }); return; }
+  if (n.parent_id == null) { tree.projectId = null; tree.selectedId = null; }
+  else if (tree.selectedId && (tree.selectedId === id || inLocalSubtree(id, tree.selectedId))) tree.selectedId = null;
+  markDirty(); renderItemsTab();
+  toast(`Deleted \u201c${sanitizeText(n.name)}\u201d`);
+}
+
+/* ---------- Tree drag & drop (HTML5 DnD) ---------- */
+function dropZone(row, e){
+  const id = row.dataset.id, target = tree.byId[id], dragId = tree.drag;
+  if (!target || !dragId || id === dragId) return null;
+  const r = row.getBoundingClientRect(), y = (e.clientY - r.top) / r.height;
+  let zone = target.parent_id == null ? 'inside' : y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'inside';
+  const newParent = zone === 'inside' ? id : target.parent_id;
+  if (inLocalSubtree(dragId, newParent)) return null; // can't drop into itself or its own subtree
+  return { zone, newParent, targetId: id };
+}
+function clearDropMarks(){ $$('#tree .tree-row').forEach(r => r.classList.remove('drop-before', 'drop-after', 'drop-inside')); }
+
+/* ---------- Item form ---------- */
+const itemForm = { nodeId: null, itemId: null, props: [], values: {}, errors: {}, tab: null, snapshot: '' };
+const cssId = (v) => (window.CSS && CSS.escape) ? CSS.escape(v) : String(v).replace(/[^\w-]/g, '\\$&');
+function itemField(pid){ return $(`#itemFormBody [data-pid="${cssId(pid)}"]`); }
+function renderItemControl(p, v){
+  const pid = esc(p.id), lab = esc(p.label);
+  switch (p.type){
+    case 'number': return `<input class="field input-text" data-ctl="text" type="text" inputmode="${p.config.kind === 'decimal' ? 'decimal' : 'numeric'}" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.kind === 'decimal' ? 'e.g. 12.5' : 'e.g. 12'}">`;
+    case 'percent': return `<div class="affix"><input class="field input-text" data-ctl="text" type="text" inputmode="numeric" aria-label="${lab}" value="${esc(v)}" placeholder="${p.config.min}\u2013${p.config.max}"><span class="affix-unit">%</span></div>`;
+    case 'hex': return `<input class="field input-text mono" data-ctl="hex" type="text" spellcheck="false" autocomplete="off" aria-label="${lab}" value="${esc(v || '0x')}">`;
+    case 'date': return `<input class="field input-text" data-ctl="text" type="${p.config.include_time ? 'datetime-local' : 'date'}" aria-label="${lab}" value="${esc(v)}">`;
+    case 'checkbox': return `<label class="check-field"><input type="checkbox" data-ctl="check" aria-label="${lab}" ${v === '1' || v === true ? 'checked' : ''}> ${lab}</label>`;
+    case 'enum': return `<div class="pick-field"><button type="button" class="pick-btn" data-ctl="enum" aria-label="${lab}">${v ? esc(v) : '<span class="placeholder">Choose or type a value\u2026</span>'}</button>
+        <button type="button" class="tbtn pick-clear" data-ctl-clear="1" title="Clear" aria-label="Clear">${ICO.purge}</button></div>`;
+    case 'icon': return `<div class="pick-field"><button type="button" class="pick-btn" data-ctl="icon" aria-label="${lab}">${v && iconExists(v) ? renderIcon(v, 18) + ' ' + esc(v) : '<span class="placeholder">Choose an icon\u2026</span>'}</button>
+        <button type="button" class="tbtn pick-clear" data-ctl-clear="1" title="Clear" aria-label="Clear">${ICO.purge}</button></div>`;
+    default: return `<input class="field input-text" data-ctl="text" type="text" aria-label="${lab}" value="${esc(v)}">`;
+  }
+}
+function openItemModal(nodeId, itemId = null){
+  const node = readNode(nodeId);
+  if (!node || !node.card_id) return;
+  if (node.card_disabled){ toast('This Card is disabled.', { type: 'error' }); return; }
+  const item = itemId ? readItem(itemId) : null;
+  const props = readProperties(node.card_id);
+  Object.assign(itemForm, { nodeId, itemId, props, values: {}, errors: {} });
+  props.forEach(p => {
+    if (isLayoutType(p.type)) return;
+    const stored = item ? item.values[p.id] : undefined;
+    itemForm.values[p.id] = p.type === 'checkbox' ? (stored != null ? stored === '1' : !!(p.config && p.config.default))
+      : p.type === 'hex' ? (stored || '0x') : (stored ?? '');
+  });
+  let tabs = groupPropertiesIntoTabs(props);
+  if (tabs.length > 1 && !tabs[0].props.length) tabs = tabs.slice(1); // no fields before the first Tab → no empty "Main"
+  itemForm.tabs = tabs; itemForm.tab = tabs[0].key;
+  $('#itemModalTitle').textContent = `${item ? 'Edit' : 'New'} Item \u00b7 ${sanitizeText(node.card_name)}`;
+  const bar = $('#itemTabs');
+  bar.hidden = tabs.length < 2;
+  bar.innerHTML = tabs.map(t => `<button type="button" class="item-tab" role="tab" data-item-tab="${esc(t.key)}" aria-selected="${t.key === itemForm.tab}">${esc(t.name)}</button>`).join('');
+  $('#itemFormBody').innerHTML = tabs.map(t => `<div class="item-pane" data-pane="${esc(t.key)}" ${t.key === itemForm.tab ? '' : 'hidden'}>
+      ${t.props.map(p => p.type === 'separator'
+        ? `<div class="item-sep"><h3>${esc(p.label)}</h3><hr></div>`
+        : `<div class="field-wrap" data-pid="${esc(p.id)}">
+            ${p.type === 'checkbox' ? '' : `<span class="field-label">${esc(p.label)}</span>`}
+            ${renderItemControl(p, itemForm.values[p.id])}
+            <div class="field-msg"></div></div>`).join('') || '<div class="empty-state">No fields on this tab.</div>'}
+    </div>`).join('') + (props.filter(p => !isLayoutType(p.type)).length ? '' : '<div class="empty-state">This Card has no properties yet.</div>');
+  $('#itemFormError').textContent = '';
+  itemForm.snapshot = JSON.stringify(itemForm.values);
+  openModal('itemModal', () => requestCloseItemModal());
+  setTimeout(() => { const first = $('#itemFormBody .item-pane:not([hidden]) [data-ctl]'); if (first) first.focus(); }, 0);
+}
+function setItemTab(key){
+  itemForm.tab = key;
+  $$('#itemTabs .item-tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.itemTab === key)));
+  $$('#itemFormBody .item-pane').forEach(p => p.hidden = p.dataset.pane !== key);
+}
+function propById(pid){ return itemForm.props.find(p => p.id === pid); }
+function validateItemField(pid, show = true){
+  const p = propById(pid); if (!p) return true;
+  const r = validateItemValue(p, itemForm.values[pid]);
+  if (r.error) itemForm.errors[pid] = r.error; else delete itemForm.errors[pid];
+  const wrap = itemField(pid);
+  if (wrap && show){
+    const m = wrap.querySelector('.field-msg'); m.className = 'field-msg' + (r.error ? ' err' : ''); m.textContent = r.error || '';
+    const ctl = wrap.querySelector('[data-ctl]'); if (ctl) ctl.classList.toggle('is-err', !!r.error);
+  }
+  markTabErrors();
+  return !r.error;
+}
+function markTabErrors(){
+  (itemForm.tabs || []).forEach(t => {
+    const bad = t.props.some(p => itemForm.errors[p.id]);
+    const b = $(`#itemTabs [data-item-tab="${cssId(t.key)}"]`); if (b) b.classList.toggle('has-error', bad);
+  });
+}
+async function requestCloseItemModal(){
+  if (JSON.stringify(itemForm.values) !== itemForm.snapshot){
+    const r = await showConfirm({ title: 'Discard changes?', text: 'Your changes to this Item haven\u2019t been saved.',
+      actions: [{ label: 'Keep editing', value: null }, { label: 'Discard', value: 'ok', kind: 'danger' }] });
+    if (!r) return;
+  }
+  closeModal('itemModal');
+}
+function saveItemFromForm(){
+  const pids = Object.keys(itemForm.values);
+  const ok = pids.map(pid => validateItemField(pid, true)).every(Boolean);
+  const err = $('#itemFormError');
+  if (!ok){
+    err.textContent = 'Please fix the highlighted fields.';
+    const t = itemForm.tabs.find(t => t.props.some(p => itemForm.errors[p.id])); if (t) setItemTab(t.key);
+    return;
+  }
+  try { saveItem({ id: itemForm.itemId, node_id: itemForm.nodeId, values: itemForm.values }); }
+  catch (e){
+    if (e.fieldErrors){ itemForm.errors = { ...e.fieldErrors }; Object.keys(e.fieldErrors).forEach(pid => {
+      const w = itemField(pid); if (w){ const m = w.querySelector('.field-msg'); m.className = 'field-msg err'; m.textContent = e.fieldErrors[pid]; } }); markTabErrors(); }
+    err.textContent = e.message || 'The Item couldn\u2019t be saved.'; return;
+  }
+  const isNew = !itemForm.itemId;
+  closeModal('itemModal');
+  markDirty(); renderItemsPanel(false); renderTree(false);
+  toast(isNew ? 'Item created' : 'Item saved');
+}
+/* Hex input: always starts with a fixed "0x" that can't be removed or edited. */
+function guardHexInput(el){
+  const fix = () => {
+    const v = el.value;
+    if (v.startsWith('0x')) return;
+    const caret = el.selectionStart;
+    el.value = '0x' + (/^0x/i.test(v) ? v.slice(2) : v);
+    const pos = Math.max(2, (caret || 0) + (el.value.length - v.length)); el.setSelectionRange(pos, pos);
+  };
+  el.addEventListener('keydown', (e) => {
+    const s = el.selectionStart, en = el.selectionEnd;
+    if (e.key === 'Backspace' && en <= 2) e.preventDefault();
+    else if (e.key === 'Delete' && s < 2 && en <= 2) e.preventDefault();
+    else if (e.key === 'Home' || (e.key === 'ArrowLeft' && s <= 2 && !e.shiftKey)){ e.preventDefault(); el.setSelectionRange(2, 2); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && s < 2){ el.setSelectionRange(2, Math.max(2, en)); }
+  });
+  el.addEventListener('input', fix);
+  const clampCaret = () => setTimeout(() => { if (el.selectionStart < 2) el.setSelectionRange(2, Math.max(2, el.selectionEnd)); }, 0);
+  el.addEventListener('focus', clampCaret); el.addEventListener('mouseup', clampCaret);
+}
+
+/* ---------- Wiring ---------- */
+function wireItems(){
+  $('#projectSelect').addEventListener('change', (e) => {
+    tree.projectId = SAFE_ID(e.target.value) ? e.target.value : null; tree.selectedId = null; renderItemsTab();
+  });
+  const treeEl = $('#tree');
+  treeEl.addEventListener('click', (e) => {
+    const row = e.target.closest('.tree-row'); if (!row) return;
+    const id = row.dataset.id;
+    const act = e.target.closest('[data-tree-action]');
+    if (act){
+      const a = act.dataset.treeAction;
+      if (a === 'toggle'){ tree.expanded.has(id) ? tree.expanded.delete(id) : tree.expanded.add(id); saveTreeState(); renderTree(false); return; }
+      if (a === 'add') return openNodeModal({ mode: 'new', parentId: id });
+      if (a === 'edit') return openNodeModal({ mode: 'edit', nodeId: id });
+      if (a === 'delete') return deleteNodeFlow(id);
+    }
+    selectNode(id);
+  });
+  treeEl.addEventListener('dblclick', (e) => {
+    const row = e.target.closest('.tree-row'); if (!row || e.target.closest('[data-tree-action]')) return;
+    const id = row.dataset.id; if (!(tree.kids[id] || []).length) return;
+    tree.expanded.has(id) ? tree.expanded.delete(id) : tree.expanded.add(id); saveTreeState(); renderTree(false);
+  });
+  treeEl.addEventListener('dragstart', (e) => {
+    const row = e.target.closest('.tree-row');
+    if (!row || row.getAttribute('draggable') !== 'true'){ e.preventDefault(); return; }
+    tree.drag = row.dataset.id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-cmap-node', tree.drag);
+    row.classList.add('dragging');
+  });
+  treeEl.addEventListener('dragover', (e) => {
+    if (!tree.drag) return; // Item rows (or anything else) can't be dropped on the tree
+    const row = e.target.closest('.tree-row'); clearDropMarks();
+    if (!row) return;
+    const z = dropZone(row, e); if (!z) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    row.classList.add('drop-' + z.zone);
+  });
+  treeEl.addEventListener('dragleave', (e) => { if (!treeEl.contains(e.relatedTarget)) clearDropMarks(); });
+  treeEl.addEventListener('drop', (e) => {
+    if (!tree.drag) return;
+    const row = e.target.closest('.tree-row'); const z = row && dropZone(row, e);
+    clearDropMarks();
+    if (!z) return;
+    e.preventDefault();
+    const dragId = tree.drag;
+    const siblings = (tree.kids[z.newParent] || []).filter(x => x !== dragId);
+    const index = z.zone === 'inside' ? siblings.length : siblings.indexOf(z.targetId) + (z.zone === 'after' ? 1 : 0);
+    try { moveNode(dragId, z.newParent, index); } catch (err){ toast(err.message, { type: 'error' }); return; }
+    if (z.zone === 'inside') tree.expanded.add(z.newParent);
+    tree.drag = null;
+    markDirty(); renderItemsTab();
+  });
+  treeEl.addEventListener('dragend', () => { tree.drag = null; clearDropMarks(); $$('#tree .dragging').forEach(r => r.classList.remove('dragging')); });
+
+  // Items table
+  $('#itemFilter').addEventListener('input', (e) => { itemsUi.filter = sanitizeText(e.target.value); renderItemsPanel(false); });
+  const body = $('#itemsBody');
+  body.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-item-action]'); if (!b || b.disabled) return;
+    const id = b.closest('tr').dataset.id;
+    if (b.dataset.itemAction === 'edit') return openItemModal(tree.selectedId, id);
+    const r = await showConfirm({ title: 'Delete Item', text: 'This Item will be permanently deleted. This action cannot be undone.',
+      actions: [{ label: 'Cancel', value: null }, { label: 'Delete permanently', value: 'ok', kind: 'danger' }] });
+    if (!r) return;
+    try { deleteItem(id); } catch (err){ toast('Delete failed: ' + err.message, { type: 'error' }); return; }
+    markDirty(); renderItemsPanel(false); toast('Item deleted');
+  });
+  // Rows are draggable only while their handle is pressed, and only when no search is active.
+  body.addEventListener('mousedown', (e) => {
+    const h = e.target.closest('[data-drag-handle]');
+    $$('#itemsBody tr[draggable]').forEach(r => r.removeAttribute('draggable'));
+    if (h && !sanitizeText(itemsUi.filter).trim()) h.closest('tr').setAttribute('draggable', 'true');
+  });
+  body.addEventListener('dragstart', (e) => {
+    const tr = e.target.closest('tr[draggable="true"]'); if (!tr){ e.preventDefault(); return; }
+    itemsUi.drag = tr.dataset.id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-cmap-item', itemsUi.drag);
+    tr.classList.add('dragging');
+  });
+  const clearRowMarks = () => $$('#itemsBody tr').forEach(r => r.classList.remove('drop-before', 'drop-after'));
+  body.addEventListener('dragover', (e) => {
+    if (!itemsUi.drag) return;
+    const tr = e.target.closest('tr[data-id]'); clearRowMarks();
+    if (!tr || tr.dataset.id === itemsUi.drag) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const r = tr.getBoundingClientRect();
+    tr.classList.add((e.clientY - r.top) < r.height / 2 ? 'drop-before' : 'drop-after');
+  });
+  body.addEventListener('drop', (e) => {
+    if (!itemsUi.drag) return;
+    const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+    e.preventDefault();
+    const before = tr.classList.contains('drop-before'); clearRowMarks();
+    const ids = $$('#itemsBody tr[data-id]').map(r => r.dataset.id).filter(x => x !== itemsUi.drag);
+    const at = ids.indexOf(tr.dataset.id) + (before ? 0 : 1);
+    ids.splice(at, 0, itemsUi.drag);
+    itemsUi.drag = null;
+    try { reorderItems(tree.selectedId, ids); } catch (err){ toast(err.message, { type: 'error' }); return; }
+    markDirty(); renderItemsPanel(false);
+  });
+  body.addEventListener('dragend', () => { itemsUi.drag = null; clearRowMarks(); $$('#itemsBody tr').forEach(r => { r.classList.remove('dragging'); r.removeAttribute('draggable'); }); });
+
+  // Node modal
+  $('#nName').addEventListener('input', () => validateNodeName(true));
+  $('#nName').addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); saveNodeFromForm(); } });
+
+  // Item modal
+  $('#itemTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-item-tab]'); if (b) setItemTab(b.dataset.itemTab); });
+  const form = $('#itemFormBody');
+  form.addEventListener('focusin', (e) => { if (e.target.dataset && e.target.dataset.ctl === 'hex' && !e.target._guard){ e.target._guard = true; guardHexInput(e.target); } });
+  form.addEventListener('input', (e) => {
+    const w = e.target.closest('[data-pid]'); if (!w) return;
+    const ctl = e.target.dataset.ctl;
+    if (ctl === 'text' || ctl === 'hex'){
+      itemForm.values[w.dataset.pid] = e.target.value; validateItemField(w.dataset.pid);
+    }
+  });
+  form.addEventListener('change', (e) => {
+    const w = e.target.closest('[data-pid]'); if (!w) return;
+    if (e.target.dataset.ctl === 'check'){ itemForm.values[w.dataset.pid] = e.target.checked; validateItemField(w.dataset.pid); }
+    if (e.target.dataset.ctl === 'text'){ itemForm.values[w.dataset.pid] = e.target.value; validateItemField(w.dataset.pid); }
+  });
+  form.addEventListener('click', (e) => {
+    const w = e.target.closest('[data-pid]'); if (!w) return;
+    const pid = w.dataset.pid, p = propById(pid); if (!p) return;
+    const btn = w.querySelector('.pick-btn');
+    const repaint = () => {
+      const v = itemForm.values[pid];
+      btn.innerHTML = p.type === 'icon'
+        ? (v && iconExists(v) ? renderIcon(v, 18) + ' ' + esc(v) : '<span class="placeholder">Choose an icon\u2026</span>')
+        : (v ? esc(v) : '<span class="placeholder">Choose or type a value\u2026</span>');
+      validateItemField(pid);
+    };
+    if (e.target.closest('[data-ctl-clear]')){ itemForm.values[pid] = ''; repaint(); return; }
+    const ctl = e.target.closest('[data-ctl]'); if (!ctl) return;
+    if (ctl.dataset.ctl === 'enum'){
+      new TypeAhead({ anchor: btn, placeholder: 'Type a value\u2026', initial: itemForm.values[pid] || '',
+        getSuggestions: () => readEnumValues(pid).map(r => ({ value: r.value, count: r.usage_count })),
+        onSelect: (v) => { itemForm.values[pid] = v; repaint(); btn.focus(); } }).open();
+    } else if (ctl.dataset.ctl === 'icon'){
+      new IconPicker({ anchor: btn, value: itemForm.values[pid] || null, onSelect: (k) => { itemForm.values[pid] = k; repaint(); btn.focus(); } }).open();
+    }
   });
 }
 
