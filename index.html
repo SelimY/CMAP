@@ -415,7 +415,6 @@ textarea.field.template{ min-height:90px; font-family:var(--font-mono); font-siz
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   padding:6px 8px; border-radius:6px; font-family:var(--font-mono); font-size:12.5px; cursor:pointer; color:var(--text);
 }
-.ta-item .ta-count{ color:var(--muted); font-size:11.5px; }
 .ta-item:hover, .ta-item.active{ background:var(--surface-2); color:var(--accent); }
 .ta-item.ta-new{ color:var(--teal); }
 .ip-pop{ width:320px; }
@@ -557,6 +556,15 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
 .items-table td.handle .drag-handle{ cursor:grab; }
 .items-table td.handle .drag-handle.locked{ opacity:.3; cursor:not-allowed; }
 
+/* RC10: Required / Key markers, clickable Cards rows */
+.col-req{ color:var(--accent); margin-left:3px; font-weight:700; }
+.col-key{ display:inline-flex; color:var(--gold); margin-left:3px; vertical-align:-1px; }
+.item-label .req{ color:var(--accent); font-weight:700; }
+.cards-table tr.row-click{ cursor:pointer; }
+.cards-table tr.row-click:hover td{ background:color-mix(in srgb, var(--accent) 6%, var(--surface-2)); }
+.cards-table td.act{ cursor:default; }
+.props-table input[data-field="is_required"]:disabled{ opacity:.6; cursor:not-allowed; }
+
 </style>
 </head>
 <body>
@@ -570,7 +578,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC9</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC10</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -746,7 +754,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
 
 </main>
 
-<footer>CMAP v1.0.RC9</footer>
+<footer>CMAP v1.0.RC10</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -786,6 +794,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
                 <th>Options</th>
                 <th>Label <span class="req">*</span></th>
                 <th class="center">Key</th>
+                <th class="center" title="Required">Req</th>
                 <th>Visibility</th>
                 <th class="act"></th>
               </tr>
@@ -879,7 +888,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC9
+   CMAP v1.0.RC10
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -889,7 +898,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC9';
+const APP_VERSION     = '1.0.RC10';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
 const SQLJS_FALLBACK_BASE = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/';
 const SQLJS_SRI = 'sha384-DJiKBv+LC78e5InEB+MvFIAH079ynMK/ERTtFUCpDzXhH1Bht7aVfpg3yOVsuYl9';
@@ -912,7 +921,8 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
         checkbox → {"default":true|false}
         text     → {"max_length":<int 1–4000>}   (NULL / missing = 255, applied when read)
         icon / enum / tab / separator → NULL
-    - tab / separator carry no value: is_key is always 0 and visibility always 'show'.
+    - tab / separator carry no value: is_key / is_required are always 0 and visibility always 'show'.
+    - checkbox: is_key / is_required are always 0. A Key property is always Required (is_key = 1 ⇒ is_required = 1).
     - nodes form the Item-Tree: parent_id NULL = root (Project); card_id NULL = "Folder", else a Card node.
       sort_order orders siblings (roots: the parent_id IS NULL group). items.sort_order orders a node's Items.
     - item_values.value stays TEXT for every type (hex stored lowercase with the "0x" prefix, e.g. 0x1a2f;
@@ -948,6 +958,7 @@ CREATE TABLE IF NOT EXISTS properties (
   label       TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 255),
   config      TEXT,
   is_key      INTEGER NOT NULL DEFAULT 0 CHECK (is_key IN (0, 1)),
+  is_required INTEGER NOT NULL DEFAULT 0 CHECK (is_required IN (0, 1)),
   visibility  TEXT NOT NULL DEFAULT 'show' CHECK (visibility IN ('show', 'hide', 'private')),
   sort_order  INTEGER NOT NULL,
   created_at  TEXT NOT NULL,
@@ -960,7 +971,6 @@ CREATE TABLE IF NOT EXISTS enum_values (
   property_id      TEXT NOT NULL REFERENCES properties (id) ON DELETE CASCADE,
   value            TEXT NOT NULL CHECK (length(value) BETWEEN 1 AND 255),
   value_normalized TEXT NOT NULL,
-  usage_count      INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL,
   UNIQUE (property_id, value_normalized)
 );
@@ -1007,12 +1017,21 @@ CREATE TABLE IF NOT EXISTS item_values (
   db.run()/db.exec() directly. In the Supabase phase, the bodies of these
   functions are replaced with Supabase client calls; their signatures stay.
 */
-const SCHEMA_VERSION = 4;   // 1 = RC1–RC4, 2 = RC5 (hex + properties.config), 3 = RC6 (tab, separator, percent, checkbox), 4 = nodes + items.node_id/sort_order
+const SCHEMA_VERSION = 5;   // 1 = RC1–RC4, 2 = RC5 (hex + properties.config), 3 = RC6 (tab, separator, percent, checkbox), 4 = nodes + items.node_id/sort_order, 5 = properties.is_required
 const USER_ID = 'sqlite';
 const PROPERTY_TYPES = ['icon', 'text', 'number', 'hex', 'enum', 'date', 'tab', 'separator', 'percent', 'checkbox'];
 /** Layout-only types: no value, not counted as properties, no Key / Visibility. */
 const LAYOUT_TYPES = ['tab', 'separator'];
 function isLayoutType(t){ return LAYOUT_TYPES.includes(t); }
+/** Types that can be neither Key nor Required (CheckBox always has a value). */
+const NO_KEY_REQ_TYPES = ['tab', 'separator', 'checkbox'];
+function allowsKeyReq(t){ return !NO_KEY_REQ_TYPES.includes(t); }
+/** 0/1 flag from untrusted input. */
+function flag01(v){
+  if (v === true || v === 1 || v === '1') return 1;
+  if (v === false || v === 0 || v === '0' || v == null || v === '') return 0;
+  throw new CmapError('invalid', 'Key and Required must be on or off.');
+}
 const VISIBILITIES = ['show', 'hide', 'private'];
 const MAX_LEN = 255;
 
@@ -1111,7 +1130,7 @@ const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Schema version of a CMAP file without a meta table, read from its table definitions. */
 function inferSchemaVersion(tables){
   const props = tables.properties || '';
-  if (tables.nodes) return 4;
+  if (tables.nodes) return /\bis_required\b/.test(props) ? 5 : 4;
   if (/'tab'/.test(props)) return 3;
   if (/\bconfig\b/.test(props)) return 2;
   return 1;
@@ -1211,6 +1230,15 @@ const MIGRATIONS = {
   2(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.fromV1); },
   // v3 (RC6): 'tab', 'separator', 'percent', 'checkbox' types. Existing data is copied unchanged.
   3(){ rebuildPropertiesTable(COPY_PROPERTIES_SQL.asIs); },
+  // v5 (RC10): properties.is_required. Files rebuilt by v2/v3 above already have the column;
+  // otherwise it is added. Key ⇒ Required; CheckBox can be neither. enum_values.usage_count is
+  // no longer used: left in old files as is (never read or written).
+  5(){
+    const ddl = (q1(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'properties'`) || {}).sql || '';
+    if (!/\bis_required\b/.test(ddl)) exec('ALTER TABLE properties ADD COLUMN is_required INTEGER NOT NULL DEFAULT 0');
+    exec('UPDATE properties SET is_required = 1 WHERE is_key = 1');
+    exec(`UPDATE properties SET is_key = 0, is_required = 0 WHERE type IN ('checkbox', 'tab', 'separator')`);
+  },
   // v4: Item-Tree. Adds the nodes table and rebuilds items with node_id + sort_order.
   // Earlier versions had no UI to create Items, so items is normally empty. If a file does contain
   // Items, they are kept: each Card's Items go to a Card node under a root named "Recovered Items".
@@ -1303,7 +1331,10 @@ function cleanPropertyInput(p){
   const layout = isLayoutType(p.type);
   const visibility = layout ? 'show' : (VISIBILITIES.includes(p.visibility) ? p.visibility : 'show');
   const config = validatePropertyConfig(p.type, p.config, label);
-  return { type: p.type, label, is_key: !layout && p.is_key ? 1 : 0, visibility, config: config == null ? null : JSON.stringify(config) };
+  let isKey = flag01(p.is_key), isReq = flag01(p.is_required);
+  if (!allowsKeyReq(p.type)){ isKey = 0; isReq = 0; }
+  if (isKey && !isReq) throw new CmapError('invalid', `"${label}" is a Key, so it must also be Required.`);
+  return { type: p.type, label, is_key: isKey, is_required: isReq, visibility, config: config == null ? null : JSON.stringify(config) };
 }
 
 /* ---------- Type-specific property settings (properties.config) ---------- */
@@ -1393,7 +1424,9 @@ const ITEM_VALUE_RULES = Object.freeze({
   date:   { input: 'DD-MM-YYYY, or DD-MM-YYYY hh:mm:ss (24 h) when config.include_time is true',
             storeAs: 'ISO 8601: YYYY-MM-DD / YYYY-MM-DDTHH:mm:ss (a stored THH:mm is read as :00 seconds)',
             mustBe: 'a real calendar date; hours 00–23, minutes and seconds 00–59' },
-  enum:   { required: true, maxLength: 255, trim: true, dedupe: 'case-insensitive, per property (upsertEnumValue)' },
+  enum:   { maxLength: 255, trim: true, dedupe: 'case-insensitive, per property (upsertEnumValue)', suggestions: 'alphabetical, no usage counts' },
+  required: { rule: 'when the property is Required (is_required = 1) the value can\u2019t be empty',
+              empty: 'text: blank after trim · hex: only "0x" · number/percent: nothing typed ("0" is a value) · date/icon/enum: nothing chosen' },
   icon:   { mustBe: 'a key of the embedded ICON_SET (iconExists)' },
   tab:       { carriesValue: false, validation: 'none; the label is only displayed (as text, never HTML)' },
   separator: { carriesValue: false, validation: 'none; the label is only displayed (as text, never HTML)' },
@@ -1478,8 +1511,8 @@ function propertyHasValues(id){ return !!q1('SELECT 1 AS x FROM item_values WHER
 function createProperty(cardId, input, sortOrder){
   const p = cleanPropertyInput(input);
   const id = newId(), t = nowIso();
-  exec(`INSERT INTO properties (id, card_id, type, label, config, is_key, visibility, sort_order, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, cardId, p.type, p.label, p.config, p.is_key, p.visibility, sortOrder, t, t]);
+  exec(`INSERT INTO properties (id, card_id, type, label, config, is_key, is_required, visibility, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, cardId, p.type, p.label, p.config, p.is_key, p.is_required, p.visibility, sortOrder, t, t]);
   return id;
 }
 function updateProperty(id, input, sortOrder){
@@ -1488,15 +1521,15 @@ function updateProperty(id, input, sortOrder){
   if (!cur) throw new CmapError('not_found', 'Property not found.');
   if (cur.type !== p.type && propertyHasValues(id))
     throw new CmapError('type_locked', `The type of "${p.label}" can't change because Items already use it.`);
-  exec(`UPDATE properties SET type = ?, label = ?, config = ?, is_key = ?, visibility = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-    [p.type, p.label, p.config, p.is_key, p.visibility, sortOrder, nowIso(), id]);
+  exec(`UPDATE properties SET type = ?, label = ?, config = ?, is_key = ?, is_required = ?, visibility = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+    [p.type, p.label, p.config, p.is_key, p.is_required, p.visibility, sortOrder, nowIso(), id]);
   if (cur.type === 'enum' && p.type !== 'enum') exec('DELETE FROM enum_values WHERE property_id = ?', [id]);
 }
 function deleteProperty(id){ exec('DELETE FROM properties WHERE id = ?', [id]); }
 
 /**
  * Saves a card and its full property list in one transaction.
- * input = { id?, name, title, description, template, properties: [{ id?, type, label, is_key, visibility }] }
+ * input = { id?, name, title, description, template, properties: [{ id?, type, label, is_key, is_required, visibility, config }] }
  * Properties missing from the list are deleted; order in the list becomes sort_order.
  */
 function saveCardWithProperties(input){
@@ -1514,25 +1547,23 @@ function saveCardWithProperties(input){
 }
 
 /* ---------- Enum values (property-specific) ---------- */
+const ENUM_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+/** Suggestions of ONE property, alphabetical (case-insensitive). No usage counts. */
 function readEnumValues(propertyId){
-  return q(`SELECT id, value, usage_count FROM enum_values WHERE property_id = ?
-            ORDER BY usage_count DESC, lower(value)`, [propertyId]);
+  return q('SELECT id, value FROM enum_values WHERE property_id = ?', [propertyId])
+    .sort((a, b) => ENUM_COLLATOR.compare(a.value, b.value) || (a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
 }
-/** Inserts the value if it is new for this property (case-insensitive); otherwise returns the existing one.
- *  countUsage=true increments usage_count (call when an Item actually uses the value). */
-function upsertEnumValue(propertyId, value, { countUsage = true } = {}){
+/** Adds the value to this property's suggestions unless it exists (case-insensitive); returns the stored spelling. */
+function upsertEnumValue(propertyId, value){
   const v = sanitizeText(value).trim();
   if (!v) throw new CmapError('invalid', 'Value is required.');
   if (v.length > MAX_LEN) throw new CmapError('invalid', 'Values can be at most 255 characters.');
   const n = normalizeEnumValue(v);
-  const existing = q1('SELECT id, value, usage_count FROM enum_values WHERE property_id = ? AND value_normalized = ?', [propertyId, n]);
-  if (existing){
-    if (countUsage) exec('UPDATE enum_values SET usage_count = usage_count + 1 WHERE id = ?', [existing.id]);
-    return { id: existing.id, value: existing.value, created: false };
-  }
+  const existing = q1('SELECT id, value FROM enum_values WHERE property_id = ? AND value_normalized = ?', [propertyId, n]);
+  if (existing) return { id: existing.id, value: existing.value, created: false };
   const id = newId();
-  exec(`INSERT INTO enum_values (id, property_id, value, value_normalized, usage_count, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, propertyId, v, n, countUsage ? 1 : 0, nowIso()]);
+  exec('INSERT INTO enum_values (id, property_id, value, value_normalized, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, propertyId, v, n, nowIso()]);
   return { id, value: v, created: true };
 }
 
@@ -1540,6 +1571,11 @@ function upsertEnumValue(propertyId, value, { countUsage = true } = {}){
    Returns { value } with the normalized string to store (null = empty, no ItemValue row) or { error }. */
 function isRealDate(y, m, d){ const dt = new Date(Date.UTC(y, m - 1, d)); return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d; }
 function validateItemValue(prop, raw){
+  const r = validateItemValueByType(prop, raw);
+  if (!r.error && r.value == null && prop.is_required && allowsKeyReq(prop.type)) return { error: 'This field is required.' };
+  return r;
+}
+function validateItemValueByType(prop, raw){
   const cfg = prop.config || defaultPropertyConfig(prop.type) || {};
   switch (prop.type){
     case 'tab': case 'separator': return { value: null };
@@ -1793,15 +1829,13 @@ function saveItem(input){
       exec('INSERT INTO items (id, card_id, node_id, user_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [id, node.card_id, nodeId, USER_ID, next, t, t]);
     }
-    const before = existing ? existing.values : {};
     exec('DELETE FROM item_values WHERE item_id = ?', [id]);
     props.forEach(p => {
       if (!(p.id in clean)) return;
       let v = clean[p.id];
       if (p.type === 'enum'){
-        // New values join this property's suggestions; usage_count grows whenever a value is (newly) chosen.
-        const changed = normalizeEnumValue(before[p.id] || '') !== normalizeEnumValue(v);
-        v = upsertEnumValue(p.id, v, { countUsage: changed }).value;
+        // New values join this property's suggestions (first spelling kept).
+        v = upsertEnumValue(p.id, v).value;
       }
       exec('INSERT INTO item_values (id, item_id, property_id, value) VALUES (?, ?, ?, ?)', [newId(), id, p.id, v]);
     });
@@ -2339,7 +2373,7 @@ class TypeAhead extends Popover {
     if (this.active >= this.rows.length) this.active = Math.max(0, this.rows.length - 1);
     this.list.innerHTML = this.rows.map((r, i) => r.isNew
       ? `<li class="ta-item ta-new${i === this.active ? ' active' : ''}" data-i="${i}" role="option">Add \u201c${esc(r.value)}\u201d</li>`
-      : `<li class="ta-item${i === this.active ? ' active' : ''}" data-i="${i}" role="option"><span>${esc(r.value)}</span><span class="ta-count">${esc(r.count ?? '')}</span></li>`
+      : `<li class="ta-item${i === this.active ? ' active' : ''}" data-i="${i}" role="option"><span>${esc(r.value)}</span></li>`
     ).join('');
     this.list.hidden = this.rows.length === 0;
     const act = this.list.children[this.active];
@@ -2535,7 +2569,7 @@ function renderCards(){
   const body = $('#cardsBody');
   body.innerHTML = visible.map(c => {
     const dis = !!c.is_disabled;
-    return `<tr data-id="${esc(c.id)}" class="${dis ? 'is-disabled' : ''}">
+    return `<tr data-id="${esc(c.id)}" class="row-click${dis ? ' is-disabled' : ''}" title="Click to edit">
       <td><span class="cell-name">${esc(c.name)}</span>${dis ? '<span class="disabled-pill">disabled</span>' : ''}${c.description ? `<span class="cell-desc">${esc(c.description)}</span>` : ''}</td>
       <td class="cell-title">${esc(c.title)}</td>
       <td class="num">${c.property_count}</td>
@@ -2599,7 +2633,7 @@ function openCardModal(card = null){
   form.cardId = card ? card.id : null;
   form.attempted = false;
   form.props = card ? card.properties.map(p => ({
-    _k: ++form.seq, id: p.id, type: p.type, label: p.label, is_key: !!p.is_key, visibility: p.visibility, has_values: !!p.has_values,
+    _k: ++form.seq, id: p.id, type: p.type, label: p.label, is_key: !!p.is_key, is_required: !!p.is_required || !!p.is_key, visibility: p.visibility, has_values: !!p.has_values,
     config: formConfigFrom(p.type, p.config),
   })) : [];
   $('#cardModalTitle').textContent = card ? `Edit Card \u00b7 ${card.name}` : 'New Card';
@@ -2617,7 +2651,7 @@ function openCardModal(card = null){
 }
 function formSnapshot(){
   return JSON.stringify([$('#fName').value, $('#fTitle').value, $('#fDesc').value, $('#fTemplate').value,
-    form.props.map(p => [p.id, p.type, p.label, p.is_key, p.visibility, p.config])]);
+    form.props.map(p => [p.id, p.type, p.label, p.is_key, p.is_required, p.visibility, p.config])]);
 }
 /** Form-side copy of a config. Hex limits are kept as the raw strings the user typed. */
 function formConfigFrom(type, cfg){
@@ -2707,8 +2741,11 @@ function renderProps(){
       </select>${p.has_values ? '<span class="type-lock">In use by Items</span>' : ''}</td>
       <td class="opts">${renderPropOptions(p)}</td>
       <td><input class="input-text${form.attempted && !p.label.trim() ? ' is-err' : ''}" data-field="label" type="text" maxlength="255" value="${esc(p.label)}" placeholder="${LABEL_HINT[p.type] || 'e.g. Status'}" aria-label="Label"></td>
-      ${isLayoutType(p.type) ? `<td class="center"><span class="opt-none">\u2014</span></td><td class="vis"><span class="opt-none">\u2014</span></td>` : `
-      <td class="center"><input type="checkbox" data-field="is_key" ${p.is_key ? 'checked' : ''} aria-label="Key"></td>
+      ${allowsKeyReq(p.type) ? `
+      <td class="center"><input type="checkbox" data-field="is_key" ${p.is_key ? 'checked' : ''} aria-label="Key" title="Key"></td>
+      <td class="center"><input type="checkbox" data-field="is_required" ${p.is_required || p.is_key ? 'checked' : ''} ${p.is_key ? 'disabled title="Key properties are always required. Clear Key first."' : 'title="Required"'} aria-label="Required"></td>`
+      : `<td class="center"><span class="opt-none">\u2014</span></td><td class="center"><span class="opt-none">\u2014</span></td>`}
+      ${isLayoutType(p.type) ? `<td class="vis"><span class="opt-none">\u2014</span></td>` : `
       <td class="vis"><select class="input-text" data-field="visibility" aria-label="Visibility">
         ${Object.keys(VIS_LABELS).map(v => `<option value="${v}" ${v === p.visibility ? 'selected' : ''}>${VIS_LABELS[v]}</option>`).join('')}
       </select></td>`}
@@ -2774,7 +2811,7 @@ function saveCardFromForm(){
     id: form.cardId,
     name: $('#fName').value, title: $('#fTitle').value,
     description: $('#fDesc').value, template: $('#fTemplate').value,
-    properties: form.props.map(p => ({ id: p.id, type: p.type, label: p.label, is_key: p.is_key, visibility: p.visibility, config: p.config })),
+    properties: form.props.map(p => ({ id: p.id, type: p.type, label: p.label, is_key: p.is_key, is_required: p.is_required || p.is_key, visibility: p.visibility, config: p.config })),
   };
   try { saveCardWithProperties(input); }
   catch (e){ err.textContent = e.message || 'The Card couldn\u2019t be saved.'; validateCardForm(); return; }
@@ -2810,7 +2847,7 @@ function wire(){
         }
         case 'new-card': return openCardModal(null);
         case 'add-prop': {
-          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, visibility: 'show', has_values: false, config: formConfigFrom('text', null) });
+          form.props.push({ _k: ++form.seq, id: null, type: 'text', label: '', is_key: false, is_required: false, visibility: 'show', has_values: false, config: formConfigFrom('text', null) });
           renderProps(); validateCardForm();
           const inputs = $$('#propsBody input[data-field="label"]'); inputs[inputs.length - 1].focus();
           return;
@@ -2824,6 +2861,9 @@ function wire(){
     }
     const rowBtn = e.target.closest('[data-row-action]');
     if (rowBtn && !rowBtn.disabled){ return onRowAction(rowBtn.dataset.rowAction, rowBtn.closest('tr').dataset.id); }
+    // Cards table: a click anywhere else on a row = Edit (the Actions cell never opens it).
+    const cardRow = e.target.closest('#cardsBody tr.row-click[data-id]');
+    if (cardRow && !e.target.closest('td.act, button')) return onRowAction('edit', cardRow.dataset.id);
 
     const propBtn = e.target.closest('[data-prop-action]');
     if (propBtn && !propBtn.disabled){
@@ -2907,7 +2947,8 @@ function wire(){
     const f = e.target.dataset.field;
     if (f === 'type'){
       p.type = e.target.value; p.config = formConfigFrom(p.type, null);
-      if (isLayoutType(p.type)){ p.is_key = false; p.visibility = 'show'; }
+      if (!allowsKeyReq(p.type)){ p.is_key = false; p.is_required = false; }
+      if (isLayoutType(p.type)) p.visibility = 'show';
       renderProps(); validateCardForm();
       const sel = $(`#propsBody tr[data-k="${p._k}"] select[data-field="type"]`); if (sel) sel.focus();
     }
@@ -2915,7 +2956,14 @@ function wire(){
     else if (f === 'cfg-time') p.config.include_time = e.target.checked;
     else if (f === 'cfg-default') p.config.default = e.target.value === '1';
     else if (f === 'visibility') p.visibility = e.target.value;
-    else if (f === 'is_key') p.is_key = e.target.checked;
+    else if (f === 'is_key'){
+      // Key ⇒ Required: checking Key checks and locks Req; clearing Key unlocks Req and leaves its value.
+      p.is_key = e.target.checked;
+      if (p.is_key) p.is_required = true;
+      renderProps(); validateCardForm();
+      const k = $(`#propsBody tr[data-k="${p._k}"] [data-field="is_key"]`); if (k) k.focus();
+    }
+    else if (f === 'is_required'){ if (!p.is_key) p.is_required = e.target.checked; else e.target.checked = true; }
   });
 
   window.addEventListener('beforeunload', (e) => {
@@ -3111,7 +3159,7 @@ function renderItemsPanel(noProjects){
   $('#itemsHead').innerHTML = `<tr><th class="handle" aria-label="Reorder"></th>${props.map(p => {
       const on = s && s.pid === p.id;
       return `<th class="${p.type === 'number' || p.type === 'percent' ? 'num ' : ''}${on ? 'sorted' : ''}" data-sort-pid="${esc(p.id)}" aria-sort="${on ? (s.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
-        <button type="button" class="sort-btn" title="${on ? (s.dir === 'asc' ? 'Sorted ascending \u2014 click for descending' : 'Sorted descending \u2014 click to clear sorting') : 'Click to sort'}">${esc(p.label)}<span class="sort-ind" aria-hidden="true">${SORT_ICO[on ? s.dir : 'none']}</span></button></th>`; }).join('')}<th class="act">Actions</th></tr>`;
+        <button type="button" class="sort-btn" title="${on ? (s.dir === 'asc' ? 'Sorted ascending \u2014 click for descending' : 'Sorted descending \u2014 click to clear sorting') : 'Click to sort'}">${esc(p.label)}${colMarks(p)}<span class="sort-ind" aria-hidden="true">${SORT_ICO[on ? s.dir : 'none']}</span></button></th>`; }).join('')}<th class="act">Actions</th></tr>`;
   const clickable = !n.card_disabled;
   $('#itemsBody').innerHTML = shown.map(it => `<tr data-id="${esc(it.id)}"${clickable ? ' class="row-click"' : ''}>
       <td class="handle"><span class="drag-handle${canReorder ? '' : ' locked'}" data-drag-handle="1" title="${canReorder ? 'Drag to reorder' : lockTip}">${TICO.grip}</span></td>
@@ -3121,6 +3169,14 @@ function renderItemsPanel(noProjects){
         <button type="button" class="tbtn danger" data-item-action="delete" title="Delete Item" aria-label="Delete">${ICO.del}</button>
       </span></td>
     </tr>`).join('');
+}
+
+const KEY_ICON = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/></svg>';
+/** Visual-only header markers: "*" for Required, then a key icon for Key. */
+function colMarks(p){
+  if (!allowsKeyReq(p.type)) return '';
+  return (p.is_required || p.is_key ? '<span class="col-req" title="Required">*</span>' : '')
+       + (p.is_key ? `<span class="col-key" title="Key">${KEY_ICON}</span>` : '');
 }
 
 /* ---------- Node form ---------- */
@@ -3258,7 +3314,7 @@ function openItemModal(nodeId, itemId = null){
       ${t.props.map(p => { if (p.type === 'separator') return `<div class="item-sep"><h3>${esc(p.label)}</h3><hr></div>`;
         const fid = 'if-' + (++seq);
         return `<div class="field-wrap item-field" data-pid="${esc(p.id)}">
-            <label class="field-label item-label" for="${fid}">${esc(p.label)}</label>
+            <label class="field-label item-label" for="${fid}">${esc(p.label)}${p.is_required && allowsKeyReq(p.type) ? ' <span class="req" title="Required">*</span>' : ''}</label>
             <div class="item-input">${renderItemControl(p, itemForm.values[p.id], fid)}
               <div class="field-foot"><div class="field-msg"></div>${p.type === 'text' ? '<span class="char-count" aria-live="polite"></span>' : ''}</div></div></div>`; }).join('')
         || '<div class="empty-state">No fields on this tab.</div>'}
@@ -3544,7 +3600,7 @@ function wireItems(){
     const ctl = e.target.closest('[data-ctl]'); if (!ctl) return;
     if (ctl.dataset.ctl === 'enum'){
       new TypeAhead({ anchor: btn, placeholder: 'Type a value\u2026', initial: itemForm.values[pid] || '',
-        getSuggestions: () => readEnumValues(pid).map(r => ({ value: r.value, count: r.usage_count })),
+        getSuggestions: () => readEnumValues(pid).map(r => ({ value: r.value })),
         onSelect: (v) => { itemForm.values[pid] = v; repaint(); btn.focus(); } }).open();
     } else if (ctl.dataset.ctl === 'icon'){
       new IconPicker({ anchor: btn, value: itemForm.values[pid] || null, onSelect: (k) => { itemForm.values[pid] = k; repaint(); btn.focus(); } }).open();
