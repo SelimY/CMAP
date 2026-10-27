@@ -20,8 +20,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<!-- sql.js (SQLite compiled to WebAssembly). Pinned version; the .wasm is loaded from the same folder via locateFile. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js"></script>
+<!-- ==================== sql.js (SQLite compiled to WebAssembly) ====================
+  Version : 1.13.0 (pinned; no "latest", no ranges)
+  File    : sql-wasm.js
+  SRI     : sha384-DJiKBv+LC78e5InEB+MvFIAH079ynMK/ERTtFUCpDzXhH1Bht7aVfpg3yOVsuYl9
+            (sha384 of dist/sql-wasm.js from the npm package sql.js@1.13.0)
+  Primary : cdnjs. Fallback (only if the primary fails to load or fails the integrity check):
+            jsDelivr, same version, same file, same hash — see dbInitEngine().
+  The .wasm is loaded from the same place and version via locateFile.
+  CMAP must be served over https:// (or http://localhost); file:// is not supported.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/sql-wasm.js" integrity="sha384-DJiKBv+LC78e5InEB+MvFIAH079ynMK/ERTtFUCpDzXhH1Bht7aVfpg3yOVsuYl9" crossorigin="anonymous"></script>
 <style>
 /* ==================== THEME TOKENS (1:1 with the Investor design reference) ==================== */
 :root{
@@ -537,6 +546,17 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
   #itemFormBody .item-field .check-field{ padding-top:0; }
 }
 
+/* RC9: save state icons, items sorting, clickable rows */
+.save-state{ display:inline-flex; align-items:center; gap:5px; }
+.save-state[data-state="saving"]{ color:var(--muted); }
+.save-state[data-state="readonly"]{ color:var(--gold); }
+.spinner.mini{ width:9px; height:9px; border-width:1.5px; }
+.items-table th[data-sort-pid] .sort-btn{ white-space:nowrap; }
+.items-table tr.row-click{ cursor:pointer; }
+.items-table tr.row-click:hover td{ background:color-mix(in srgb, var(--accent) 6%, var(--surface-2)); }
+.items-table td.handle .drag-handle{ cursor:grab; }
+.items-table td.handle .drag-handle.locked{ opacity:.3; cursor:not-allowed; }
+
 </style>
 </head>
 <body>
@@ -550,7 +570,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
         <rect x="9"  y="11" width="22" height="16" rx="4" fill="#0D9488"/>
         <rect x="15" y="19" width="22" height="16" rx="4" fill="#F97316"/>
       </svg>
-      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC8</span></span>
+      <span class="brand-text">CMAP<span class="brand-version">v1.0.RC9</span></span>
       <span class="brand-slogan">Your records, unlimited relationships.</span>
     </div>
 
@@ -629,7 +649,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
         </button>
       </div>
       <div class="welcome-foot">
-        <button type="button" class="import-btn secondary reopen-btn" id="reopenBtn" data-action="reopen-db" hidden>Reopen <span id="reopenName">CMAP.sqlite</span></button>
+        <button type="button" class="import-btn secondary reopen-btn" id="reopenBtn" data-action="reopen-db" hidden>Reopen last: <span id="reopenName">CMAP.sqlite</span></button>
         <span class="muted-note" id="welcomeFallbackNote" hidden>Automatic saving isn’t supported in this browser. You’ll download your database manually after changes.</span>
       </div>
     </section>
@@ -726,7 +746,7 @@ textarea.item-area{ resize:vertical; min-height:calc(3 * 1.45em + 20px); line-he
 
 </main>
 
-<footer>CMAP v1.0.RC8</footer>
+<footer>CMAP v1.0.RC9</footer>
 
 <!-- ==================== CARD MODAL ==================== -->
 <div id="cardModal" class="modal-overlay" hidden>
@@ -859,7 +879,7 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
 
 'use strict';
 /* ============================================================================
-   CMAP v1.0.RC8
+   CMAP v1.0.RC9
    Sections (in order):
      1. SCHEMA (schema.sql)        — portable CREATE TABLE statements
      2. DB ADAPTER                 — the ONLY place that talks to SQL
@@ -869,15 +889,17 @@ const ICON_SET = {"General":{"home":"<path d=\"M5 12l-2 0l9 -9l9 9l-2 0\"/><path
      6. APP UI                     — header, tabs, Cards tab, Card modal
    ========================================================================== */
 
-const APP_VERSION     = '1.0.RC8';
+const APP_VERSION     = '1.0.RC9';
 const SQLJS_BASE      = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.13.0/';
+const SQLJS_FALLBACK_BASE = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/';
+const SQLJS_SRI = 'sha384-DJiKBv+LC78e5InEB+MvFIAH079ynMK/ERTtFUCpDzXhH1Bht7aVfpg3yOVsuYl9';
 const DEFAULT_DB_NAME = 'CMAP.sqlite';
 
 // ---- SCHEMA (schema.sql) START ----
 /*
   Target: SQLite now (sql.js), Supabase / PostgreSQL later.
   Written to be copied into a Supabase migration with minimal edits:
-    - No AUTOINCREMENT, no PRAGMA, no STRICT tables (STRICT is SQLite-only; CHECK constraints are used instead).
+    - Standard SQL only: no AUTOINCREMENT, no PRAGMA; value rules are CHECK constraints.
     - All ids are TEXT UUIDs generated by the app (crypto.randomUUID) → change to `uuid` in Postgres.
     - All timestamps are ISO 8601 TEXT → may become `timestamptz` in Postgres.
     - 0/1 INTEGER flags → may become `boolean` in Postgres (update the CHECKs accordingly).
@@ -899,6 +921,7 @@ const DEFAULT_DB_NAME = 'CMAP.sqlite';
     -- card_access (card_id, grantee_user_id, permission 'read'|'write') for CoWork sharing.
 */
 const SCHEMA_SQL = `
+-- File identity and schema version. Required keys: db_id (UUID), schema_version (integer as text).
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -1038,15 +1061,38 @@ function mapSqlError(e){
 }
 
 /* ---------- Engine & connection ---------- */
+function loadScriptOnce(src, integrity){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.integrity = integrity; s.crossOrigin = 'anonymous';
+    s.onload = resolve; s.onerror = () => reject(new Error('load failed'));
+    document.head.appendChild(s);
+  });
+}
 async function dbInitEngine(){
+  // Primary copy is loaded by the <script> tag in <head>. If it failed (offline, blocked or
+  // integrity mismatch), try the fallback copy of the SAME version with the SAME hash.
+  let base = SQLJS_BASE;
+  if (typeof window.initSqlJs !== 'function'){
+    try { await loadScriptOnce(SQLJS_FALLBACK_BASE + 'sql-wasm.js', SQLJS_SRI); base = SQLJS_FALLBACK_BASE; } catch (_) {}
+  }
   if (typeof window.initSqlJs !== 'function') throw new CmapError('engine', 'The database engine (sql.js) could not be loaded.');
-  SQL = await window.initSqlJs({ locateFile: f => SQLJS_BASE + f });
+  SQL = await window.initSqlJs({ locateFile: f => base + f });
 }
 /* SQLite enforces foreign keys (and therefore ON DELETE CASCADE) only when this
    per-connection setting is on. It is a SQLite runtime setting, deliberately kept
    OUT of the schema block — Postgres always enforces foreign keys. */
-function dbEnableForeignKeys(){ db.run('PRAGMA foreign_keys = ON;'); }
-function dbConnect(database){ db = database; dbEnableForeignKeys(); }
+function dbEnableForeignKeys(){
+  // The ONLY PRAGMA CMAP uses (runtime setting, not part of the schema). Read back and verified.
+  db.run('PRAGMA foreign_keys = ON;');
+  const r = db.exec('PRAGMA foreign_keys');
+  if (!(r[0] && r[0].values[0] && r[0].values[0][0] === 1))
+    throw new CmapError('fk_off', 'Foreign key enforcement could not be turned on, so the database was not opened.');
+}
+function dbConnect(database){
+  db = database;
+  try { dbEnableForeignKeys(); } catch (e){ dbClose(); throw e; }
+}
 function dbIsOpen(){ return !!db; }
 
 function dbCreateNew(){
@@ -1054,40 +1100,81 @@ function dbCreateNew(){
   dbConnect(new SQL.Database());
   tx(() => {
     db.exec(SCHEMA_SQL);
-    exec('INSERT INTO meta (key, value) VALUES (?, ?), (?, ?), (?, ?)',
-      ['app', 'CMAP', 'schema_version', String(SCHEMA_VERSION), 'created_with', APP_VERSION]);
+    exec('INSERT INTO meta (key, value) VALUES (?, ?), (?, ?), (?, ?), (?, ?)',
+      ['app', 'CMAP', 'db_id', newId(), 'schema_version', String(SCHEMA_VERSION), 'created_with', APP_VERSION]);
   });
 }
 
+const MSG_NOT_CMAP = 'This file is not a CMAP database.';
+const MSG_NEWER = 'This database was created by a newer version of CMAP.';
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Schema version of a CMAP file without a meta table, read from its table definitions. */
+function inferSchemaVersion(tables){
+  const props = tables.properties || '';
+  if (tables.nodes) return 4;
+  if (/'tab'/.test(props)) return 3;
+  if (/\bconfig\b/.test(props)) return 2;
+  return 1;
+}
+/**
+ * Validates and loads a file. Foreign / empty / corrupt files and files from a newer CMAP
+ * are rejected BEFORE anything currently open is touched. Old CMAP files are upgraded in place
+ * (step by step, by schema_version) and get a meta table with db_id when missing.
+ */
 function dbOpenBytes(bytes){
-  let candidate;
+  let candidate, tables = {};
   try {
     candidate = new SQL.Database(bytes);
-    candidate.exec('SELECT count(*) FROM sqlite_master');
+    const r = candidate.exec("SELECT name, sql FROM sqlite_master WHERE type = 'table'");
+    (r[0] ? r[0].values : []).forEach(([n, s]) => { tables[n] = s || ''; });
   } catch (e){
-    if (candidate) candidate.close();
-    throw new CmapError('not_sqlite', 'This file is not a SQLite database.');
+    if (candidate) try { candidate.close(); } catch (_) {}
+    throw new CmapError('not_cmap', MSG_NOT_CMAP);
   }
-  const hasMeta = candidate.exec("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").length > 0;
-  let app = null, ver = 0;
+  const reject = (code, msg) => { try { candidate.close(); } catch (_) {} throw new CmapError(code, msg); };
+  if (!tables.cards || !tables.properties) reject('not_cmap', MSG_NOT_CMAP);
+  let ver, app = null, hasMeta = !!tables.meta;
   if (hasMeta){
-    const r = candidate.exec("SELECT key, value FROM meta WHERE key IN ('app','schema_version')");
-    (r[0] ? r[0].values : []).forEach(([k, v]) => { if (k === 'app') app = v; if (k === 'schema_version') ver = parseInt(v, 10) || 0; });
+    let rows = [];
+    try { const r = candidate.exec("SELECT key, value FROM meta WHERE key IN ('app', 'schema_version')"); rows = r[0] ? r[0].values : []; }
+    catch (_) { reject('not_cmap', MSG_NOT_CMAP); }
+    rows.forEach(([k, v]) => { if (k === 'app') app = v; if (k === 'schema_version') ver = /^\d{1,4}$/.test(String(v)) ? parseInt(v, 10) : NaN; });
+    if (app != null && app !== 'CMAP') reject('not_cmap', MSG_NOT_CMAP);
+    if (Number.isNaN(ver)) reject('not_cmap', MSG_NOT_CMAP);
   }
-  if (app !== 'CMAP'){ candidate.close(); throw new CmapError('not_cmap', 'This SQLite file was not created by CMAP.'); }
-  if (ver > SCHEMA_VERSION){
-    candidate.close();
-    throw new CmapError('newer_schema', `This file uses a newer CMAP format (schema ${ver}). Please open it with a newer version of CMAP.`);
-  }
+  if (ver == null) ver = inferSchemaVersion(tables);
+  if (ver > SCHEMA_VERSION) reject('newer_schema', MSG_NEWER);
   dbClose();
   dbConnect(candidate);
-  if (ver < SCHEMA_VERSION){
-    try { dbMigrate(ver); }
-    catch (e){ dbClose(); throw new CmapError('migration_failed', 'This file couldn\u2019t be upgraded to the current CMAP format: ' + (e.message || e)); }
-    return { migrated: true };
+  let changed = false;
+  try {
+    if (ver < SCHEMA_VERSION){ dbMigrate(ver); changed = true; }
+    if (dbEnsureMeta()) changed = true;
+  } catch (e){
+    dbClose();
+    throw new CmapError('migration_failed', 'This file couldn\u2019t be upgraded to the current CMAP format: ' + (e.message || e));
   }
-  return { migrated: false };
+  return { migrated: changed };
 }
+/** Makes sure meta exists with app, a valid db_id and the current schema_version. Returns true if it wrote anything. */
+function dbEnsureMeta(){
+  let wrote = false;
+  tx(() => {
+    db.exec(tableDdl('meta'));
+    const get = (k) => (q1('SELECT value FROM meta WHERE key = ?', [k]) || {}).value;
+    const put = (k, v) => { exec('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', [k, v]); wrote = true; };
+    if (get('app') !== 'CMAP') put('app', 'CMAP');
+    if (!UUID_RX.test(get('db_id') || '')) put('db_id', newId());
+    if (get('schema_version') !== String(SCHEMA_VERSION)) put('schema_version', String(SCHEMA_VERSION));
+  });
+  return wrote;
+}
+/** This file's id (UUID) — used to key per-file UI state. */
+function dbGetId(){
+  const v = (q1("SELECT value FROM meta WHERE key = 'db_id'") || {}).value;
+  return UUID_RX.test(v || '') ? v : null;
+}
+function countCards(){ return q1('SELECT COUNT(*) AS n FROM cards WHERE user_id = ?', [USER_ID]).n; }
 
 /* ---------- Schema migrations (SQLite-specific; NOT part of the schema block) ----------
    Each step upgrades from version (n-1) to n. Data is always preserved. */
@@ -1155,16 +1242,20 @@ const MIGRATIONS = {
   },
 };
 function dbMigrate(fromVersion){
-  // Foreign keys must be off while a referenced table is rebuilt, otherwise dropping it
-  // would cascade-delete enum_values / item_values. The setting can't change inside a transaction.
+  // Same foreign_keys setting, switched off ONLY while a referenced table is rebuilt (dropping it would
+  // otherwise cascade-delete enum_values / item_values). It is switched back on and verified afterwards.
   db.run('PRAGMA foreign_keys = OFF;');
   try {
     tx(() => {
       for (let v = fromVersion + 1; v <= SCHEMA_VERSION; v++) if (MIGRATIONS[v]) MIGRATIONS[v]();
-      db.exec(SCHEMA_SQL); // create anything else that is missing (indexes, new tables)
-      const broken = db.exec('PRAGMA foreign_key_check');
-      if (broken.length && broken[0].values.length) throw new Error('foreign key check failed');
-      exec("UPDATE meta SET value = ? WHERE key = 'schema_version'", [String(SCHEMA_VERSION)]);
+      db.exec(SCHEMA_SQL); // create anything else that is missing (indexes, new tables, meta)
+      const orphans = q1(`SELECT
+          (SELECT COUNT(*) FROM properties p WHERE NOT EXISTS (SELECT 1 FROM cards c WHERE c.id = p.card_id)) +
+          (SELECT COUNT(*) FROM enum_values e WHERE NOT EXISTS (SELECT 1 FROM properties p WHERE p.id = e.property_id)) +
+          (SELECT COUNT(*) FROM items i WHERE NOT EXISTS (SELECT 1 FROM nodes n WHERE n.id = i.node_id)) +
+          (SELECT COUNT(*) FROM item_values v WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.id = v.item_id)) AS n`).n;
+      if (orphans) throw new Error('the data has broken references');
+      exec("INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", [String(SCHEMA_VERSION)]);
     });
   } finally {
     dbEnableForeignKeys();
@@ -1369,6 +1460,8 @@ function recoverCard(id){ exec('UPDATE cards SET is_disabled = 0, updated_at = ?
 function purgeCard(id){
   tx(() => {
     if (countItemsForCard(id) > 0) throw new CmapError('has_items', 'This Card has Items and cannot be purged. Delete its Items first.');
+    // Explicit steps in addition to the FK rules (nodes.card_id SET NULL, properties CASCADE).
+    exec('UPDATE nodes SET card_id = NULL, updated_at = ? WHERE card_id = ?', [nowIso(), id]);
     exec('DELETE FROM cards WHERE id = ? AND user_id = ?', [id, USER_ID]);
   });
 }
@@ -1638,7 +1731,17 @@ function moveNode(id, newParentId, index){
   });
 }
 /** Deletes a node with its whole subtree and all their Items / ItemValues (ON DELETE CASCADE). */
-function deleteNodeSubtree(id){ tx(() => exec('DELETE FROM nodes WHERE id = ? AND user_id = ?', [id, USER_ID])); }
+function deleteNodeSubtree(id){
+  tx(() => {
+    // Explicit deletes (values → items → nodes) in addition to the FK cascades.
+    exec(`WITH RECURSIVE sub (id) AS (SELECT id FROM nodes WHERE id = ? AND user_id = ? UNION ALL SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id)
+          DELETE FROM item_values WHERE item_id IN (SELECT i.id FROM items i WHERE i.node_id IN (SELECT id FROM sub))`, [id, USER_ID]);
+    exec(`WITH RECURSIVE sub (id) AS (SELECT id FROM nodes WHERE id = ? AND user_id = ? UNION ALL SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id)
+          DELETE FROM items WHERE node_id IN (SELECT id FROM sub)`, [id, USER_ID]);
+    exec(`WITH RECURSIVE sub (id) AS (SELECT id FROM nodes WHERE id = ? AND user_id = ? UNION ALL SELECT n.id FROM nodes n JOIN sub ON n.parent_id = sub.id)
+          DELETE FROM nodes WHERE id IN (SELECT id FROM sub)`, [id, USER_ID]);
+  });
+}
 
 /* ---------- Items ---------- */
 /** Direct Items of a node, in order, each with { values: { property_id: value } }. */
@@ -1670,6 +1773,8 @@ function saveItem(input){
     if (!node) throw new CmapError('not_found', 'Node not found.');
     if (!node.card_id) throw new CmapError('invalid', 'Folder nodes can\u2019t hold Items.');
     if (node.card_disabled) throw new CmapError('card_disabled', 'This Card is disabled.');
+    if (existing && existing.card_id !== node.card_id)
+      throw new CmapError('inconsistent', 'This Item doesn\u2019t match its node\u2019s Card and can\u2019t be saved.');
     const props = readProperties(node.card_id);
     const clean = {}, fieldErrors = {};
     props.forEach(p => {
@@ -1722,7 +1827,7 @@ function readActiveCardsForNodes(){
 // ---- FILE PERSISTENCE START ----
 const fsSupported = typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
 const FILE_TYPES = [{ description: 'CMAP database', accept: { 'application/x-sqlite3': ['.sqlite', '.sqlite3', '.db'] } }];
-const SAVE_DEBOUNCE_MS = 800;
+const SAVE_DEBOUNCE_MS = 1500;
 
 const store = {
   handle: null,        // FileSystemFileHandle (Chromium) or null
@@ -1733,6 +1838,8 @@ const store = {
   saving: null,        // in-flight save promise
   canWrite: false,     // write permission confirmed
   lastError: null,
+  lastModified: null,  // file's lastModified after our last load / write (external-change detection)
+  conflict: false,     // file changed outside CMAP: no writes until the user decides
 };
 
 /* ---- IndexedDB: remembers the last file handle for "Reopen" ---- */
@@ -1796,51 +1903,64 @@ function describeFileError(e){
 function markDirty(){
   store.dirty = true;
   store.changeSeq++;
-  if (store.handle && store.canWrite){
-    setSaveState('saving');
-    clearTimeout(store.saveTimer);
-    store.saveTimer = setTimeout(() => { saveNow({ interactive: false }); }, SAVE_DEBOUNCE_MS);
-  } else {
-    setSaveState('dirty');
-  }
+  setSaveState('dirty');
+  if (store.handle && store.canWrite && !store.conflict) scheduleSave();
+}
+function scheduleSave(){
+  clearTimeout(store.saveTimer);
+  store.saveTimer = setTimeout(() => { saveNow({ interactive: false }); }, SAVE_DEBOUNCE_MS);
+}
+async function rememberModified(){
+  try { store.lastModified = (await store.handle.getFile()).lastModified; } catch (_) {}
+}
+async function fileChangedOnDisk(){
+  if (!store.handle || store.lastModified == null) return false;
+  const f = await store.handle.getFile();
+  return f.lastModified !== store.lastModified;
 }
 
+/* Writes are queued: only one write runs at a time. */
+let saveChain = Promise.resolve();
+function saveNow(opts){
+  const p = saveChain.then(() => doSave(opts));
+  saveChain = p.catch(() => {});
+  return p;
+}
 /**
- * Writes the database to its file now. interactive=true means a user gesture
- * triggered it (so we may ask for permission, and fall back to a download).
+ * Writes the database to its file. interactive = a user gesture triggered it (permission may be
+ * asked; in fallback mode it downloads). force = write even if the file changed outside CMAP.
  */
-async function saveNow({ interactive }){
+async function doSave({ interactive = false, force = false } = {}){
   clearTimeout(store.saveTimer); store.saveTimer = null;
   if (!dbIsOpen()) return true;
-  if (store.saving) { await store.saving.catch(() => {}); if (!store.dirty) return true; }
-
-  // Fallback mode (or a file without a handle): manual download.
-  if (!store.handle){
-    if (!interactive) { setSaveState('dirty'); return false; }
+  if (!store.handle){ // fallback mode: manual download only
+    if (!interactive) { if (store.dirty) setSaveState('dirty'); return false; }
     downloadBytes(dbExportBytes(), store.fileName);
     store.dirty = false; store.lastError = null;
-    setSaveState('downloaded');
+    setSaveState('saved');
     return true;
   }
-
+  if (!store.dirty && !interactive && !force) return true;
+  if (store.conflict && !force){ setSaveState('dirty'); if (interactive) showConflictModal(); return false; }
   const seq = store.changeSeq;
-  const job = (async () => {
+  try {
     if (!store.canWrite){
       store.canWrite = await ensureWritePermission(store.handle, interactive);
       if (!store.canWrite) throw Object.assign(new Error('permission'), { name: 'NotAllowedError' });
     }
+    if (!force && await fileChangedOnDisk()){
+      store.conflict = true; setSaveState('dirty'); showConflictModal(); return false;
+    }
     setSaveState('saving');
     await writeBytesToHandle(store.handle, dbExportBytes());
-  })();
-  store.saving = job;
-  try {
-    await job;
+    await rememberModified();
     if (seq === store.changeSeq) store.dirty = false;
     store.lastError = null;
-    setSaveState(store.dirty ? 'saving' : 'saved');
-    if (store.dirty) markDirtyReschedule();
+    setSaveState(store.dirty ? 'dirty' : 'saved');
+    if (store.dirty && store.canWrite) scheduleSave();
     return true;
   } catch (e){
+    // The data stays in memory; the next change or "Save" tries again.
     store.lastError = e;
     if (e && e.name === 'NotAllowedError') store.canWrite = false;
     setSaveState('error');
@@ -1849,15 +1969,68 @@ async function saveNow({ interactive }){
       action: { label: 'Download a copy', fn: () => { downloadBytes(dbExportBytes(), store.fileName); } },
     });
     return false;
-  } finally {
-    store.saving = null;
   }
 }
-function markDirtyReschedule(){
+
+/* ---------- External change: the file was modified outside CMAP ---------- */
+let conflictOpen = false;
+async function showConflictModal(){
+  if (conflictOpen || !dbIsOpen() || !store.handle) return;
+  conflictOpen = true;
   clearTimeout(store.saveTimer);
-  store.saveTimer = setTimeout(() => { saveNow({ interactive: false }); }, SAVE_DEBOUNCE_MS);
+  setSaveState('dirty');
+  const r = await showConfirm({
+    title: 'File changed outside CMAP',
+    text: 'The database file was changed outside CMAP. Nothing will be saved until you choose what to do.',
+    actions: [
+      { label: 'Save a copy\u2026', value: 'copy' },
+      { label: 'Reload from disk', value: 'reload' },
+      { label: 'Overwrite file', value: 'overwrite', kind: 'danger' },
+    ],
+  });
+  conflictOpen = false;
+  if (!r) return; // still paused; the next save attempt asks again
+  if (r.value === 'overwrite'){
+    store.conflict = false;
+    if (await saveNow({ interactive: true, force: true })) toast('Saved over the changed file.');
+  } else if (r.value === 'reload'){
+    await reloadFromDisk();
+  } else if (r.value === 'copy'){
+    await saveCopyAndSwitch();
+  }
+}
+async function reloadFromDisk(){
+  let file, res;
+  try { file = await store.handle.getFile(); res = dbOpenBytes(new Uint8Array(await file.arrayBuffer())); }
+  catch (e){ toast((e && e.message) || describeFileError(e), { type: 'error' }); return false; }
+  Object.assign(store, { dirty: false, changeSeq: 0, conflict: false, lastModified: file.lastModified, lastError: null });
+  setSaveState('saved');
+  afterDatabaseReloaded();
+  if (res && res.migrated){ markDirty(); }
+  toast('Reloaded from disk.');
+  return true;
+}
+async function saveCopyAndSwitch(){
+  let handle;
+  const base = String(store.fileName || DEFAULT_DB_NAME).replace(/\.(sqlite3?|db)$/i, '');
+  try { handle = await window.showSaveFilePicker({ suggestedName: `${base} (copy).sqlite`, types: FILE_TYPES }); }
+  catch (e){ if (!(e && e.name === 'AbortError')) toast('The copy couldn\u2019t be created.', { type: 'error' }); setSaveState('dirty'); return false; }
+  try { await writeBytesToHandle(handle, dbExportBytes()); }
+  catch (e){ toast(describeFileError(e), { type: 'error' }); setSaveState('dirty'); return false; }
+  Object.assign(store, { handle, fileName: handle.name || `${base} (copy).sqlite`, canWrite: true, dirty: false, changeSeq: 0, conflict: false, lastError: null });
+  await rememberModified();
+  await idbSet('lastHandle', handle);
+  $('#dbFileName').textContent = store.fileName;
+  setSaveState('saved');
+  toast(`Saved a copy as \u201c${store.fileName}\u201d. CMAP now uses this file.`);
+  return true;
+}
+async function checkExternalChange(){
+  if (!dbIsOpen() || !store.handle || store.conflict || conflictOpen) return;
+  try { if (await fileChangedOnDisk()){ store.conflict = true; showConflictModal(); } } catch (_) {}
 }
 
+/* ---------- New / Open / Reopen ---------- */
 async function newDatabaseFlow(){
   if (!SQL) return;
   if (!(await leaveCurrentDatabase())) return;
@@ -1865,17 +2038,12 @@ async function newDatabaseFlow(){
     let handle;
     try {
       handle = await window.showSaveFilePicker({ suggestedName: DEFAULT_DB_NAME, types: FILE_TYPES });
-    } catch (e){ if (e && e.name === 'AbortError') return; toast('The file couldn\u2019t be created. ' + (e.message || ''), { type: 'error' }); return; }
+    } catch (e){ if (e && e.name === 'AbortError') return; toast('The file couldn\u2019t be created.', { type: 'error' }); return; }
     dbCreateNew();
-    try {
-      await writeBytesToHandle(handle, dbExportBytes());
-    } catch (e){
-      dbClose();
-      toast(describeFileError(e), { type: 'error' });
-      return;
-    }
-    store.handle = handle; store.fileName = handle.name || DEFAULT_DB_NAME; store.canWrite = true;
-    store.dirty = false; store.changeSeq = 0;
+    try { await writeBytesToHandle(handle, dbExportBytes()); }
+    catch (e){ dbClose(); toast(describeFileError(e), { type: 'error' }); return; }
+    Object.assign(store, { handle, fileName: handle.name || DEFAULT_DB_NAME, canWrite: true, dirty: false, changeSeq: 0, conflict: false });
+    await rememberModified();
     await idbSet('lastHandle', handle);
     enterDatabase();
     setSaveState('saved');
@@ -1891,10 +2059,10 @@ async function newDatabaseFlow(){
     let name = sanitizeText(r.input || '').replace(/[\\/:*?"<>|]/g, '').trim() || DEFAULT_DB_NAME;
     if (!/\.(sqlite3?|db)$/i.test(name)) name += '.sqlite';
     dbCreateNew();
-    store.handle = null; store.fileName = name; store.canWrite = false; store.dirty = false; store.changeSeq = 0;
+    Object.assign(store, { handle: null, fileName: name, canWrite: false, dirty: false, changeSeq: 0, conflict: false, lastModified: null });
     downloadBytes(dbExportBytes(), name);
     enterDatabase();
-    setSaveState('downloaded');
+    setSaveState('saved');
   }
 }
 
@@ -1905,7 +2073,7 @@ async function openDatabaseFlow(){
     let handle;
     try {
       [handle] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false });
-    } catch (e){ if (e && e.name === 'AbortError') return; toast('The file couldn\u2019t be opened. ' + (e.message || ''), { type: 'error' }); return; }
+    } catch (e){ if (e && e.name === 'AbortError') return; toast('The file couldn\u2019t be opened.', { type: 'error' }); return; }
     await openFromHandle(handle, { interactive: true });
   } else {
     const input = document.createElement('input');
@@ -1913,12 +2081,13 @@ async function openDatabaseFlow(){
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0];
       if (!file) return;
-      try {
-        await loadBytesIntoDb(new Uint8Array(await file.arrayBuffer()));
-      } catch (e){ toast(e.message || 'The file couldn\u2019t be opened.', { type: 'error' }); return; }
-      store.handle = null; store.fileName = file.name; store.canWrite = false; store.dirty = false; store.changeSeq = 0;
+      let res;
+      try { res = await loadBytesIntoDb(new Uint8Array(await file.arrayBuffer())); }
+      catch (e){ toast(e.message || MSG_NOT_CMAP, { type: 'error' }); showWelcome(); return; }
+      Object.assign(store, { handle: null, fileName: sanitizeText(file.name).slice(0, 255) || DEFAULT_DB_NAME, canWrite: false, dirty: false, changeSeq: 0, conflict: false, lastModified: null });
       enterDatabase();
-      setSaveState('opened');
+      setSaveState('saved');
+      if (res && res.migrated){ markDirty(); toast('This file was updated to the current CMAP format. Download it to keep the update.'); }
     });
     input.click();
   }
@@ -1930,49 +2099,58 @@ async function loadBytesIntoDb(bytes){
   finally { showCardsLoading(false); }
 }
 
+/** Loads a file from a handle. Returns false (and shows an error) if it can't be used. */
 async function openFromHandle(handle, { interactive }){
   let file;
   try { file = await handle.getFile(); }
-  catch (e){
-    toast(describeFileError(e), { type: 'error' });
-    if (e && e.name === 'NotFoundError'){ await idbDel('lastHandle'); refreshReopen(); }
-    return false;
-  }
+  catch (e){ toast(describeFileError(e), { type: 'error' }); showWelcome(); return false; }
   let res;
   try { res = await loadBytesIntoDb(new Uint8Array(await file.arrayBuffer())); }
-  catch (e){ toast(e.message || 'The file couldn\u2019t be opened.', { type: 'error' }); return false; }
-
-  store.handle = handle; store.fileName = handle.name || file.name; store.dirty = false; store.changeSeq = 0;
+  catch (e){ toast(e.message || MSG_NOT_CMAP, { type: 'error' }); showWelcome(); return false; }
+  Object.assign(store, { handle, fileName: handle.name || file.name, dirty: false, changeSeq: 0, conflict: false, lastModified: file.lastModified, lastError: null });
   store.canWrite = await ensureWritePermission(handle, interactive);
   await idbSet('lastHandle', handle);
   enterDatabase();
+  setSaveState(store.canWrite ? 'saved' : 'readonly');
   if (res && res.migrated){ markDirty(); toast('This file was updated to the current CMAP format.'); }
-  if (store.canWrite) setSaveState(store.dirty ? 'saving' : 'saved');
-  else {
-    setSaveState('readonly');
-    toast('CMAP needs permission to save to this file. Click the save button to allow it.', { timeout: 8000 });
-  }
+  if (!store.canWrite) toast('CMAP needs permission to save to this file. Click the save button to allow it.', { timeout: 8000 });
   return true;
 }
 
+/** The remembered handle, validated (IndexedDB content is untrusted). */
+async function getStoredHandle(){
+  const h = await idbGet('lastHandle');
+  if (!h || typeof h !== 'object' || h.kind !== 'file' || typeof h.getFile !== 'function') return null;
+  if (typeof h.name !== 'string' || !h.name || h.name.length > 255) return null;
+  return h;
+}
+async function forgetStoredHandle(){ await idbDel('lastHandle'); refreshReopen(); }
+
 async function reopenLastFlow(){
-  const handle = await idbGet('lastHandle');
-  if (!handle){ refreshReopen(); return; }
+  const handle = await getStoredHandle();
+  if (!handle){ await forgetStoredHandle(); return; }
+  // Ask first, while the click still counts as a user gesture.
+  let granted = false;
+  try {
+    let p = await handle.queryPermission({ mode: 'readwrite' });
+    if (p !== 'granted') p = await handle.requestPermission({ mode: 'readwrite' });
+    granted = p === 'granted';
+  } catch (_) { granted = false; }
+  if (!granted){ toast(`Permission to open \u201c${sanitizeText(handle.name)}\u201d was denied.`, { type: 'error' }); await forgetStoredHandle(); return; }
   if (!(await leaveCurrentDatabase())) return;
-  // Ask for write access first, while the click still counts as a user gesture.
-  await ensureWritePermission(handle, true);
-  await openFromHandle(handle, { interactive: true });
+  const ok = await openFromHandle(handle, { interactive: true });
+  if (!ok) await forgetStoredHandle();
 }
 
 /** Saves or asks before closing the current database. Returns false if the user cancels. */
 async function leaveCurrentDatabase(){
   if (!dbIsOpen()) return true;
-  if (store.dirty && store.handle && store.canWrite) await saveNow({ interactive: true });
+  if (store.dirty && store.handle && store.canWrite && !store.conflict) await saveNow({ interactive: true });
   if (store.dirty){
     const r = await showConfirm({
       title: 'Unsaved changes',
       text: store.handle
-        ? 'Your latest changes couldn\u2019t be written to the file. Download a copy before switching?'
+        ? 'Your latest changes haven\u2019t been written to the file. Download a copy before switching?'
         : 'Your latest changes haven\u2019t been downloaded yet. Download the database before switching?',
       actions: [
         { label: 'Cancel', value: null },
@@ -1989,7 +2167,7 @@ async function leaveCurrentDatabase(){
 function closeDatabase(){
   clearTimeout(store.saveTimer);
   dbClose();
-  Object.assign(store, { handle: null, fileName: null, dirty: false, changeSeq: 0, saveTimer: null, canWrite: false, lastError: null });
+  Object.assign(store, { handle: null, fileName: null, dirty: false, changeSeq: 0, saveTimer: null, canWrite: false, lastError: null, lastModified: null, conflict: false });
   showWelcome();
 }
 // ---- FILE PERSISTENCE END ----
@@ -2216,13 +2394,22 @@ const ui = { tab: 'cards', filter: '', hideDisabled: false, sort: { key: 'name',
 
 /* ---------- Save state badge ---------- */
 const SAVE_LABELS = {
-  saved: 'Saved', saving: 'Saving\u2026', dirty: 'Unsaved changes', error: 'Not saved',
-  readonly: 'Read-only', downloaded: 'Downloaded', opened: 'Opened',
+  saved: 'Saved', saving: 'Saving\u2026', dirty: 'Unsaved changes', error: 'Save failed', readonly: 'Read-only',
+};
+const SAVE_ICONS = {
+  saved:   '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  saving:  '<span class="spinner mini" aria-hidden="true"></span>',
+  dirty:   '<svg viewBox="0 0 24 24" width="9" height="9" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>',
+  error:   '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 7v6M12 17h.01"/></svg>',
+  readonly:'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="11" width="12" height="9" rx="2"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>',
 };
 function setSaveState(state){
   const el = $('#saveState');
-  el.dataset.state = (state === 'downloaded' || state === 'opened') ? 'saved' : (state === 'readonly' ? 'error' : state);
-  el.textContent = SAVE_LABELS[state] || state;
+  if (!SAVE_LABELS[state]) state = 'saved';
+  el.dataset.state = state;
+  el.innerHTML = SAVE_ICONS[state];
+  const t = document.createElement('span'); t.className = 'save-label'; t.textContent = SAVE_LABELS[state]; el.appendChild(t);
+  el.setAttribute('role', 'status');
   const btn = $('#btnSave');
   btn.classList.toggle('attention', state === 'dirty' || state === 'error' || state === 'readonly');
   btn.title = store.handle ? 'Save now' : 'Download database';
@@ -2250,7 +2437,17 @@ function enterDatabase(){
   $('#fallbackBanner').hidden = !!store.handle;
   $('#viewWelcome').hidden = true;
   ui.filter = ''; $('#cardFilter').value = '';
-  setTab('cards');
+  loadTreeState();
+  itemsUi.sort = null; itemsUi.filter = ''; $('#itemFilter').value = '';
+  // Default tab on every open: Items when the file has any Card (disabled ones too), otherwise Cards.
+  setTab(countCards() > 0 ? 'items' : 'cards');
+}
+/** After "Reload from disk": same tab, fresh data. */
+function afterDatabaseReloaded(){
+  $('#dbFileName').textContent = store.fileName || DEFAULT_DB_NAME;
+  loadTreeState();
+  itemsUi.sort = null;
+  setTab(ui.tab);
 }
 function setTab(tab){
   ui.tab = tab;
@@ -2265,9 +2462,9 @@ function setTab(tab){
 async function refreshReopen(){
   const btn = $('#reopenBtn');
   if (!fsSupported){ btn.hidden = true; return; }
-  const h = await idbGet('lastHandle');
+  const h = await getStoredHandle();
   btn.hidden = !h || dbIsOpen();
-  if (h) $('#reopenName').textContent = h.name || DEFAULT_DB_NAME;
+  if (h) $('#reopenName').textContent = sanitizeText(h.name);
 }
 
 /* ---------- Cards table ---------- */
@@ -2344,6 +2541,7 @@ function renderCards(){
       <td class="num">${c.property_count}</td>
       <td class="num">${c.record_count}</td>
       <td class="act row-actions"><span class="act-pair">${dis ? `
+          <button type="button" class="tbtn edit-disabled-card" data-row-action="edit" title="Edit Card" aria-label="Edit">${ICO.edit}</button>
           <button type="button" class="tbtn purge" data-row-action="purge" ${c.record_count > 0 ? 'disabled title="This Card has Items and cannot be purged. Delete its Items first."' : 'title="Purge — delete permanently"'} aria-label="Purge">${ICO.purge}</button>
           <button type="button" class="tbtn recover" data-row-action="recover" title="Recover — make active again" aria-label="Recover">${ICO.recover}</button>` : `
           <button type="button" class="tbtn" data-row-action="edit" title="Edit Card" aria-label="Edit">${ICO.edit}</button>
@@ -2478,14 +2676,16 @@ function renderPropOptions(p){
       <span class="opt-unit">max chars</span></span>`;
   return '<span class="opt-none">\u2014</span>';
 }
+/** Asked when a changed form is closed (X, Cancel, Esc, backdrop). Resolves true to discard. */
+async function confirmDiscard(){
+  const r = await showConfirm({
+    title: 'Unsaved changes', text: 'You have unsaved changes. Discard them?',
+    actions: [{ label: 'Keep editing', value: null }, { label: 'Discard', value: 'ok', kind: 'danger' }],
+  });
+  return !!r;
+}
 async function requestCloseCardModal(){
-  if (formSnapshot() !== form.snapshot){
-    const r = await showConfirm({
-      title: 'Discard changes?', text: 'Your changes to this Card haven\u2019t been saved.',
-      actions: [{ label: 'Keep editing', value: null }, { label: 'Discard', value: 'ok', kind: 'danger' }],
-    });
-    if (!r) return;
-  }
+  if (formSnapshot() !== form.snapshot && !(await confirmDiscard())) return;
   closeModal('cardModal');
 }
 
@@ -2648,7 +2848,7 @@ function wire(){
       const which = closer.dataset.close;
       if (which === 'card') return requestCloseCardModal();
       if (which === 'confirm') return confirmResolver && confirmResolver(null);
-      if (which === 'node') return closeModal('nodeModal');
+      if (which === 'node') return requestCloseNodeModal();
       if (which === 'item') return requestCloseItemModal();
     }
     // Menu: close when clicking elsewhere
@@ -2721,6 +2921,12 @@ function wire(){
   window.addEventListener('beforeunload', (e) => {
     if (dbIsOpen() && store.dirty){ e.preventDefault(); e.returnValue = ''; }
   });
+  // Leaving the tab writes any pending change right away.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && dbIsOpen() && store.dirty && store.handle && store.canWrite && !store.conflict) saveNow({ interactive: false });
+  });
+  // Coming back: was the file changed by something else meanwhile?
+  window.addEventListener('focus', () => { checkExternalChange(); });
 }
 
 /* ==================== ITEMS TAB: Item-Tree + Items ==================== */
@@ -2734,10 +2940,41 @@ const TICO = {
   boxOff: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-label="Unchecked"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>',
 };
 const tree = { projectId: null, selectedId: null, expanded: new Set(), nodes: [], byId: {}, kids: {}, drag: null };
-const itemsUi = { filter: '', drag: null, props: [], node: null };
+const itemsUi = { filter: '', drag: null, props: [], node: null, sort: null }; // sort: { pid, dir } — memory only
+const ITEM_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+/** Type-aware sort key; null = empty (always sorted last). */
+function itemSortKey(p, v){
+  if (v == null || v === '') return null;
+  switch (p.type){
+    case 'number': case 'percent': { const n = Number(v); return Number.isFinite(n) ? n : null; }
+    case 'hex': try { return BigInt(String(v).toLowerCase().startsWith('0x') ? v : '0x' + v); } catch (_) { return null; }
+    case 'date': return isoToDateDisplay(v, true);
+    case 'checkbox': return v === '1' ? 1 : 0;
+    default: return String(v);
+  }
+}
+function compareItemKeys(a, b){
+  if (typeof a === 'string' && typeof b === 'string') return ITEM_COLLATOR.compare(a, b);
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+function sortItemsForView(list){
+  const s = itemsUi.sort; if (!s) return list;
+  const p = itemsUi.props.find(x => x.id === s.pid); if (!p) return list;
+  const sign = s.dir === 'desc' ? -1 : 1;
+  return list.map((it, i) => ({ it, i, k: itemSortKey(p, it.values[p.id]) }))
+    .sort((a, b) => {
+      if (a.k == null || b.k == null) return (a.k == null) - (b.k == null) || a.i - b.i; // empties last, both directions
+      return (compareItemKeys(a.k, b.k) * sign) || a.i - b.i;                          // ties keep the manual order
+    }).map(x => x.it);
+}
+function cycleItemSort(pid){
+  const s = itemsUi.sort;
+  itemsUi.sort = !s || s.pid !== pid ? { pid, dir: 'asc' } : s.dir === 'asc' ? { pid, dir: 'desc' } : null;
+  renderItemsPanel(false);
+}
 
 /* ---------- UI state in localStorage (keyed by database file name; read as untrusted input) ---------- */
-function treeStateKey(){ return 'cmap-ui:' + (store.fileName || DEFAULT_DB_NAME); }
+function treeStateKey(){ return 'cmap-ui:' + (dbIsOpen() ? (dbGetId() || 'unknown') : 'none'); }
 const SAFE_ID = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64 && /^[A-Za-z0-9_-]+$/.test(v);
 function loadTreeState(){
   let raw = null;
@@ -2813,7 +3050,7 @@ function renderTree(noProjects){
   box.innerHTML = out.join('');
 }
 function selectNode(id){
-  tree.selectedId = id; itemsUi.filter = ''; $('#itemFilter').value = '';
+  tree.selectedId = id; itemsUi.filter = ''; $('#itemFilter').value = ''; itemsUi.sort = null;
   saveTreeState();
   $$('#tree .tree-row').forEach(r => { const on = r.dataset.id === id; r.classList.toggle('selected', on); r.setAttribute('aria-selected', String(on)); });
   renderItemsPanel(false);
@@ -2861,16 +3098,23 @@ function renderItemsPanel(noProjects){
   } catch (e){ $('#itemsLoading').hidden = true; toast('Items couldn\u2019t be loaded: ' + e.message, { type: 'error' }); return; }
   $('#itemsLoading').hidden = true;
   itemsUi.props = props;
+  if (itemsUi.sort && !props.some(p => p.id === itemsUi.sort.pid)) itemsUi.sort = null;
   if (!items.length) return itemsEmpty('<strong>No Items yet</strong>' + (n.card_disabled ? 'This Card is disabled.' : 'Use \u201cNew\u201d to add the first one.'));
   const f = sanitizeText(itemsUi.filter).trim().toLowerCase();
-  const shown = f ? items.filter(it => props.some(p => cellText(p, it.values[p.id]).toLowerCase().includes(f))) : items;
+  const shown = sortItemsForView(f ? items.filter(it => props.some(p => cellText(p, it.values[p.id]).toLowerCase().includes(f))) : items);
   if (!shown.length) return itemsEmpty('No Items match your search');
   $('#itemsEmpty').hidden = true;
   $('#itemsTable').hidden = false;
-  const canReorder = !f;
-  $('#itemsHead').innerHTML = `<tr><th class="handle" aria-label="Reorder"></th>${props.map(p => `<th class="${p.type === 'number' || p.type === 'percent' ? 'num' : ''}">${esc(p.label)}</th>`).join('')}<th class="act">Actions</th></tr>`;
-  $('#itemsBody').innerHTML = shown.map(it => `<tr data-id="${esc(it.id)}">
-      <td class="handle"><span class="drag-handle" data-drag-handle="1" ${canReorder ? 'title="Drag to reorder"' : 'title="Clear the search to reorder" style="opacity:.35;cursor:not-allowed"'}>${TICO.grip}</span></td>
+  const canReorder = !f && !itemsUi.sort;
+  const lockTip = itemsUi.sort ? 'Clear column sorting to reorder rows' : 'Clear the search to reorder';
+  const s = itemsUi.sort;
+  $('#itemsHead').innerHTML = `<tr><th class="handle" aria-label="Reorder"></th>${props.map(p => {
+      const on = s && s.pid === p.id;
+      return `<th class="${p.type === 'number' || p.type === 'percent' ? 'num ' : ''}${on ? 'sorted' : ''}" data-sort-pid="${esc(p.id)}" aria-sort="${on ? (s.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
+        <button type="button" class="sort-btn" title="${on ? (s.dir === 'asc' ? 'Sorted ascending \u2014 click for descending' : 'Sorted descending \u2014 click to clear sorting') : 'Click to sort'}">${esc(p.label)}<span class="sort-ind" aria-hidden="true">${SORT_ICO[on ? s.dir : 'none']}</span></button></th>`; }).join('')}<th class="act">Actions</th></tr>`;
+  const clickable = !n.card_disabled;
+  $('#itemsBody').innerHTML = shown.map(it => `<tr data-id="${esc(it.id)}"${clickable ? ' class="row-click"' : ''}>
+      <td class="handle"><span class="drag-handle${canReorder ? '' : ' locked'}" data-drag-handle="1" title="${canReorder ? 'Drag to reorder' : lockTip}">${TICO.grip}</span></td>
       ${props.map(p => `<td class="cell-val${p.type === 'number' || p.type === 'percent' ? ' num' : ''}">${formatCell(p, it.values[p.id])}</td>`).join('')}
       <td class="act"><span class="act-pair">
         <button type="button" class="tbtn" data-item-action="edit" ${n.card_disabled ? 'disabled title="This Card is disabled"' : 'title="Edit Item"'} aria-label="Edit">${ICO.edit}</button>
@@ -2880,7 +3124,12 @@ function renderItemsPanel(noProjects){
 }
 
 /* ---------- Node form ---------- */
-const nodeForm = { mode: 'new', parentId: null, nodeId: null };
+const nodeForm = { mode: 'new', parentId: null, nodeId: null, snapshot: '' };
+function nodeFormSnapshot(){ return JSON.stringify([$('#nName').value, $('#nType').value]); }
+async function requestCloseNodeModal(){
+  if (nodeFormSnapshot() !== nodeForm.snapshot && !(await confirmDiscard())) return;
+  closeModal('nodeModal');
+}
 function openNodeModal({ mode, parentId = null, nodeId = null }){
   Object.assign(nodeForm, { mode, parentId, nodeId });
   const node = nodeId ? readNode(nodeId) : null;
@@ -2896,7 +3145,8 @@ function openNodeModal({ mode, parentId = null, nodeId = null }){
   sel.disabled = locked;
   $('#nTypeMsg').textContent = locked ? 'This node has Items, so its type cannot be changed.' : '';
   $('#nodeFormError').textContent = ''; $('#nNameMsg').textContent = ''; $('#nName').classList.remove('is-err');
-  openModal('nodeModal', () => closeModal('nodeModal'));
+  nodeForm.snapshot = nodeFormSnapshot();
+  openModal('nodeModal', () => requestCloseNodeModal());
   setTimeout(() => $('#nName').focus(), 0);
 }
 function validateNodeName(show){
@@ -3067,9 +3317,7 @@ function markTabErrors(){
 }
 async function requestCloseItemModal(){
   if (JSON.stringify(itemForm.values) !== itemForm.snapshot){
-    const r = await showConfirm({ title: 'Discard changes?', text: 'Your changes to this Item haven\u2019t been saved.',
-      actions: [{ label: 'Keep editing', value: null }, { label: 'Discard', value: 'ok', kind: 'danger' }] });
-    if (!r) return;
+    if (!(await confirmDiscard())) return;
   }
   closeModal('itemModal');
 }
@@ -3117,7 +3365,7 @@ function guardHexInput(el){
 /* ---------- Wiring ---------- */
 function wireItems(){
   $('#projectSelect').addEventListener('change', (e) => {
-    tree.projectId = SAFE_ID(e.target.value) ? e.target.value : null; tree.selectedId = null; renderItemsTab();
+    tree.projectId = SAFE_ID(e.target.value) ? e.target.value : null; tree.selectedId = null; itemsUi.sort = null; renderItemsTab();
   });
   const treeEl = $('#tree');
   treeEl.addEventListener('click', (e) => {
@@ -3174,8 +3422,19 @@ function wireItems(){
   // Items table
   $('#itemFilter').addEventListener('input', (e) => { itemsUi.filter = sanitizeText(e.target.value); renderItemsPanel(false); });
   const body = $('#itemsBody');
+  $('#itemsHead').addEventListener('click', (e) => {
+    const th = e.target.closest('th[data-sort-pid]'); if (th) cycleItemSort(th.dataset.sortPid);
+  });
   body.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-item-action]'); if (!b || b.disabled) return;
+    const b = e.target.closest('[data-item-action]');
+    if (!b){
+      // A click anywhere else on the row opens the Item (not on the drag handle; not for a disabled Card).
+      if (e.target.closest('[data-drag-handle]')) return;
+      const tr = e.target.closest('tr.row-click[data-id]');
+      if (tr && itemsUi.node && !itemsUi.node.card_disabled) openItemModal(tree.selectedId, tr.dataset.id);
+      return;
+    }
+    if (b.disabled) return;
     const id = b.closest('tr').dataset.id;
     if (b.dataset.itemAction === 'edit') return openItemModal(tree.selectedId, id);
     const r = await showConfirm({ title: 'Delete Item', text: 'This Item will be permanently deleted. This action cannot be undone.',
@@ -3188,7 +3447,7 @@ function wireItems(){
   body.addEventListener('mousedown', (e) => {
     const h = e.target.closest('[data-drag-handle]');
     $$('#itemsBody tr[draggable]').forEach(r => r.removeAttribute('draggable'));
-    if (h && !sanitizeText(itemsUi.filter).trim()) h.closest('tr').setAttribute('draggable', 'true');
+    if (h && !sanitizeText(itemsUi.filter).trim() && !itemsUi.sort) h.closest('tr').setAttribute('draggable', 'true');
   });
   body.addEventListener('dragstart', (e) => {
     const tr = e.target.closest('tr[draggable="true"]'); if (!tr){ e.preventDefault(); return; }
@@ -3300,13 +3559,19 @@ async function boot(){
   const buttons = $$('[data-action="new-db"], [data-action="open-db"], [data-action="reopen-db"]');
   buttons.forEach(b => b.disabled = true);
   const state = $('#engineState');
+  if (location.protocol === 'file:'){
+    // File System Access, IndexedDB handles and the integrity-checked engine need a real web origin.
+    state.dataset.state = 'error';
+    $('#engineStateText').textContent = 'CMAP can\u2019t run from a local file (file://). Open it from its web address (https://) or from http://localhost.';
+    return;
+  }
   try {
     await dbInitEngine();
     state.dataset.state = 'ready';
     buttons.forEach(b => b.disabled = false);
   } catch (e){
     state.dataset.state = 'error';
-    $('#engineStateText').textContent = 'The database engine couldn\u2019t be loaded. Check your internet connection and reload the page.';
+    $('#engineStateText').textContent = 'The database engine couldn\u2019t be loaded (no connection, or the download failed its integrity check). Check your connection and reload the page.';
   }
 }
 boot();
