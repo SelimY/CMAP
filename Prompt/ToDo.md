@@ -2,9 +2,6 @@
 
 Bu dosya, ana prompt (`README.md`) kapsamına henüz alınmayan, sonraya bırakılan veya netleştirilmesi beklenen maddeleri tutar. Her madde karara bağlandığında fark promptuna dönüştürülür ve Archive ile ana prompt'a işlenir.
 
-## A. Netleştirilecek
-1. **Enum alanı zorunlu mu?** Bölüm 8 alan tablosunda Enum "Zorunlu: Evet", Bölüm 8.1'de "Boş olamaz" yazıyor; Item formunda ise tüm alanlar opsiyonel. Önerilen düzeltme: "değer girildiyse boş olamaz".
-
 ## B. Veri güvenliği ve hacim
 2. **Yedek / geri alma:** Silmeler kalıcı ve geri alınamaz. Öneri: "Export copy" butonu veya her oturum başında otomatik yedek.
 3. **Veri hacmi:** Tüm veritabanı bellekte tutulur ve her kayıtta tam export yapılır. Beklenen Item sayısı ve dosya boyutu belirlenmeli (öneri: ~50 MB hedef). Items tablosu için sayfalama veya sanal kaydırma kararı buna bağlı.
